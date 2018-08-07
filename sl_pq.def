@@ -19,13 +19,13 @@ typedef node =
     };
 
 export opaque
-typedef shavit_lotan_pqueue =
+typedef sl_pq_t =
     { head  node,
       tail  node
     };
 
 export
-def shavit_lotan_pqueue_print (set *shavit_lotan_pqueue) -> void
+def sl_pq_print (set *sl_pq_t) -> void
 begin
     var node = set.head.next[0];
     while unmark(node) != &set.tail do
@@ -42,22 +42,22 @@ end
 /** Return a new fixed-height skip list.
  */
 export
-def shavit_lotan_pqueue_create () -> *shavit_lotan_pqueue
+def sl_pq_create () -> *sl_pq_t
 begin
-    var shavit_lotan_pqueue = new shavit_lotan_pqueue;
-    shavit_lotan_pqueue.head.val = 0x8000000000000000I64;
-    shavit_lotan_pqueue.tail.val = 0x7FFFFFFFFFFFFFFFI64;
+    var slpq = new sl_pq_t;
+    slpq.head.val = 0x8000000000000000I64;
+    slpq.tail.val = 0x7FFFFFFFFFFFFFFFI64;
     for var i = 0; i < 20; ++i do
-        shavit_lotan_pqueue.head.next[i] = &shavit_lotan_pqueue.tail;
-        shavit_lotan_pqueue.tail.next[i] = nil;
+        slpq.head.next[i] = &slpq.tail;
+        slpq.tail.next[i] = nil;
     od
-    return shavit_lotan_pqueue;
+    return slpq;
 end
 
 /** Add a node, lock-free, to the skiplist.
  */
 export
-def shavit_lotan_pqueue_add (seed *u64, set *shavit_lotan_pqueue, x i64) -> bool
+def sl_pq_add (seed *u64, set *sl_pq_t, x i64) -> bool
 begin
     var preds [20]*node;
     var succs [20]*node;
@@ -97,7 +97,7 @@ end
 /** Remove a node, lock-free, from the skiplist.
  */
 export
-def shavit_lotan_pqueue_remove (set *shavit_lotan_pqueue, x i64) -> bool
+def sl_pq_remove (set *sl_pq_t, x i64) -> bool
 begin
     var preds [20]*node;
     var succs [20]*node;
@@ -144,7 +144,7 @@ end
 /** Remove a node, lock-free, from the skiplist.  Leak the memory.
  */
 export
-def shavit_lotan_pqueue_leaky_remove (set *shavit_lotan_pqueue, x i64) -> bool
+def sl_pq_leaky_remove (set *sl_pq_t, x i64) -> bool
 begin
     var preds [20]*node;
     var succs [20]*node;
@@ -190,7 +190,7 @@ end
  *  Leak the memory.
  */
 export
-def shavit_lotan_pqueue_leaky_pop_min (set *shavit_lotan_pqueue) -> bool
+def sl_pq_leaky_pop_min (set *sl_pq_t) -> bool
 begin
     while true do
         var curr = unmark(set.head.next[0]);
@@ -205,7 +205,7 @@ begin
             var res = __builtin_cas(&curr.state, ACTIVE, DELETED);
             if res then 
                 // Physically delete the node now.
-                return shavit_lotan_pqueue_leaky_remove(set, curr.val);
+                return sl_pq_leaky_remove(set, curr.val);
             fi
         od
     od
@@ -215,7 +215,7 @@ end
  *  Don't leak the memory.
  */
 export
-def shavit_lotan_pqueue_pop_min (set *shavit_lotan_pqueue) -> bool
+def sl_pq_pop_min (set *sl_pq_t) -> bool
 begin
     while true do
         var curr = unmark(set.head.next[0]);
@@ -230,7 +230,7 @@ begin
             var res = __builtin_cas(&curr.state, ACTIVE, DELETED);
             if res then 
                 // Physically delete the node now.
-                return shavit_lotan_pqueue_remove(set, curr.val);
+                return sl_pq_remove(set, curr.val);
             fi
         od
     od
@@ -258,7 +258,7 @@ begin
     return level - 1;
 end
 
-def find (set *shavit_lotan_pqueue,
+def find (set *sl_pq_t,
           key i64,
           preds [20]*node,
           succs [20]*node) -> bool

@@ -12,17 +12,17 @@ CFLAGS = $(OPTLEVEL) -mrtm
 
 DEF_STRUCTURES = \
 	fhsl_lf.def \
-	btlf.def \
-	shavit_lotan_pqueue.def \
-	spray_pqueue.def
+	bt_lf.def \
+	sl_pq.def \
+	spray_pq.def
 
 C_STRUCTURES = \
 	c_fhsl_lf.c \
-	c_btlf.c \
-	c_shavit_lotan_pqueue.c \
-	c_spray_pqueue.c \
-	c_maged_michael_table.c \
-	c_split_order_table.c
+	c_bt_lf.c \
+	c_sl_pq.c \
+	c_spray_pq.c \
+	c_mm_ht.c \
+	c_so_ht.c
 
 DEFIFILES = $(DEF_STRUCTURES:.def=.defi)
 

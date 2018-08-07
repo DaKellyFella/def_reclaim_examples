@@ -1,4 +1,4 @@
-#include "c_split_order_table.h"
+#include "c_so_ht.h"
 #include <forkscan.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -6,35 +6,35 @@
 
 typedef int64_t key_t;
 typedef key_t so_key_t;
-typedef struct c_soht_node_t c_soht_node_t;
-typedef c_soht_node_t volatile * volatile c_soht_node_ptr;
-typedef struct c_soht_list_view_t c_soht_list_view_t;
+typedef struct c_so_ht_node_t c_so_ht_node_t;
+typedef c_so_ht_node_t volatile * volatile c_so_ht_node_ptr;
+typedef struct list_view_t list_view_t;
 
-struct c_soht_node_t {
+struct c_so_ht_node_t {
   uint64_t key;
-  c_soht_node_ptr next;
+  c_so_ht_node_ptr next;
 };
 
-struct c_soht_t {
+struct c_so_ht_t {
   uint64_t max_load;
   volatile size_t size, count;
-  c_soht_node_ptr *table;
+  c_so_ht_node_ptr *table;
 };
 
-struct c_soht_list_view_t {
+struct list_view_t {
   // Only previous needs to be "*", not a mistake.
-  c_soht_node_ptr * previous, current, next;
+  c_so_ht_node_ptr * previous, current, next;
 };
 
-static c_soht_node_ptr mark(c_soht_node_ptr ptr) {
-  return (c_soht_node_ptr)((uintptr_t)ptr | 0x1);
+static c_so_ht_node_ptr mark(c_so_ht_node_ptr ptr) {
+  return (c_so_ht_node_ptr)((uintptr_t)ptr | 0x1);
 }
 
-static c_soht_node_ptr unmark(c_soht_node_ptr ptr) {
-  return (c_soht_node_ptr)((uintptr_t)ptr & ~0x1);
+static c_so_ht_node_ptr unmark(c_so_ht_node_ptr ptr) {
+  return (c_so_ht_node_ptr)((uintptr_t)ptr & ~0x1);
 }
 
-static bool is_marked(c_soht_node_ptr ptr) {
+static bool is_marked(c_so_ht_node_ptr ptr) {
   return ((uintptr_t)ptr & 0x1) == 0x1;
 }
 
@@ -63,10 +63,10 @@ static bool is_dummy(uint64_t key) {
   return (key & 0x1) == 0x0;
 }
 
-void c_soht_print(c_soht_t *set) {
+void c_so_ht_print(c_so_ht_t *set) {
   for(size_t i = 0; i < set->size; i++) {
-    c_soht_node_ptr list = set->table[i];
-    c_soht_node_ptr unmarked_list = unmark(list);
+    c_so_ht_node_ptr list = set->table[i];
+    c_so_ht_node_ptr unmarked_list = unmark(list);
     if(list == NULL) continue;
     printf("Dummy node[%lu] with dummy key[%lu] is marked %d\n", so_dummy_key(unmarked_list->key), unmarked_list->key, is_marked(unmarked_list->next));
     assert(is_dummy(unmarked_list->key));
@@ -79,7 +79,7 @@ void c_soht_print(c_soht_t *set) {
   }
 }
 
-static bool find(c_soht_list_view_t * view, c_soht_node_ptr *head, uint64_t key) {
+static bool find(list_view_t * view, c_so_ht_node_ptr *head, uint64_t key) {
 try_again:
   view->previous = head;
   view->current = *head;
@@ -106,7 +106,7 @@ try_again:
   return true;
 }
 
-static int c_list_add(c_soht_list_view_t *view, c_soht_node_ptr *head, c_soht_node_ptr new_node) {
+static int c_list_add(list_view_t *view, c_so_ht_node_ptr *head, c_so_ht_node_ptr new_node) {
   uint64_t key = new_node->key;
   while(true) {
     if(find(view, head, key)) {
@@ -119,9 +119,9 @@ static int c_list_add(c_soht_list_view_t *view, c_soht_node_ptr *head, c_soht_no
   }
 }
 
-static int c_list_remove_leaky(c_soht_node_ptr *head, uint64_t key) {
+static int c_list_remove_leaky(c_so_ht_node_ptr *head, uint64_t key) {
   while(true) {
-    c_soht_list_view_t view;
+    list_view_t view;
     if(!find(&view, head, key)) {
       return false;
     }
@@ -147,14 +147,14 @@ static key_t get_parent(size_t bucket) {
   return reverse_bits(copy_bucket);
 }
 
-static void initialise_bucket(c_soht_t *set, size_t bucket) {
+static void initialise_bucket(c_so_ht_t *set, size_t bucket) {
   size_t parent = get_parent(bucket);
   if(set->table[parent] == NULL) {
     initialise_bucket(set, parent);
   }
-  c_soht_node_ptr dummy_node = forkscan_malloc(sizeof(c_soht_node_t));
+  c_so_ht_node_ptr dummy_node = forkscan_malloc(sizeof(c_so_ht_node_t));
   dummy_node->key = so_dummy_key(bucket);
-  c_soht_list_view_t view;
+  list_view_t view;
   if(!c_list_add(&view, &set->table[parent], dummy_node)) {
     forkscan_free((void*)dummy_node);
     dummy_node = unmark(view.current);
@@ -162,37 +162,37 @@ static void initialise_bucket(c_soht_t *set, size_t bucket) {
   set->table[bucket] = dummy_node;
 }
 
-c_soht_t * c_soht_create(size_t size, uint64_t max_load) {
-  c_soht_t *ret = forkscan_malloc(sizeof(c_soht_t));
+c_so_ht_t * c_so_ht_create(size_t size, uint64_t max_load) {
+  c_so_ht_t *ret = forkscan_malloc(sizeof(c_so_ht_t));
   ret->size = size;
   ret->max_load = max_load;
   ret->count = 0;
-  ret->table = forkscan_malloc(size * sizeof(c_soht_node_ptr));
+  ret->table = forkscan_malloc(size * sizeof(c_so_ht_node_ptr));
   for(uint64_t i = 0; i < size; i++) {
     ret->table[i] = NULL;
   }
-  ret->table[0] = forkscan_malloc(sizeof(c_soht_node_t));
+  ret->table[0] = forkscan_malloc(sizeof(c_so_ht_node_t));
   ret->table[0]->key = so_dummy_key(0);
   return ret;
 }
 
-int c_soht_contains(c_soht_t *set, key_t key) {
+int c_so_ht_contains(c_so_ht_t *set, key_t key) {
   size_t bucket = key % set->size;
   if(set->table[bucket] == NULL) {
     initialise_bucket(set, bucket);
   }
-  c_soht_list_view_t view;
+  list_view_t view;
   return find(&view, &set->table[bucket], so_regular_key(key));
 }
 
-int c_soht_add(c_soht_t *set, key_t key) {
-  c_soht_node_ptr node = forkscan_malloc(sizeof(c_soht_node_t));
+int c_so_ht_add(c_so_ht_t *set, key_t key) {
+  c_so_ht_node_ptr node = forkscan_malloc(sizeof(c_so_ht_node_t));
   node->key = so_regular_key(key);
   size_t bucket = key % set->size;
   if(set->table[bucket] == NULL) {
     initialise_bucket(set, bucket);
   }
-  c_soht_list_view_t view;
+  list_view_t view;
   if(!c_list_add(&view, &set->table[bucket], node)) {
     forkscan_free((void*)node);
     return false;
@@ -204,7 +204,7 @@ int c_soht_add(c_soht_t *set, key_t key) {
   return true;
 }
 
-int c_soht_remove_leaky(c_soht_t *set, key_t key) {
+int c_so_ht_remove_leaky(c_so_ht_t *set, key_t key) {
   size_t bucket = key % set->size;
   if(set->table[bucket] == NULL) {
     initialise_bucket(set, bucket);

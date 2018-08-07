@@ -20,7 +20,7 @@ typedef node_t =
     };
 
 export opaque
-typedef spray_pqueue_config_t =
+typedef spray_pq_config_t =
     {
       thread_count i64,
       start_height i64,
@@ -31,14 +31,14 @@ typedef spray_pqueue_config_t =
 
 // Strange BUG I found trying to initialise this struct
 export
-def spray_pqueue_config_paper(threads u64) -> spray_pqueue_config_t
+def spray_pq_config_paper(threads u64) -> spray_pq_config_t
 begin
   var log_arg = threads;
   if threads == 1 then
     log_arg = 2;
   fi
 
-  var spray_config spray_pqueue_config_t = {
+  var spray_config spray_pq_config_t = {
     cast(type i64, threads), cast(type i64, log2(threads) + 1),
     cast(type i64, log2(threads) + 1), 1I64, 
     threads * cast(type i64, log2(log_arg))
@@ -47,9 +47,9 @@ begin
 end
 
 export opaque
-typedef spray_pqueue_t =
+typedef spray_pq_t =
     {
-      config spray_pqueue_config_t,
+      config spray_pq_config_t,
       padding_head  *node_t,
       head  node_t,
       tail  node_t
@@ -58,7 +58,7 @@ typedef spray_pqueue_t =
 /** Print out the contents of the skip list along with node heights.
  */
 export
-def spray_pqueue_print (set *spray_pqueue_t) -> void
+def spray_pq_print (set *spray_pq_t) -> void
 begin
     printf("HEAD: %lld ", set.head.priority);
     if set.head.state == DELETED then
@@ -98,10 +98,10 @@ end
 /** Return a new fixed-height skip list.
  */
 export
-def spray_pqueue_create (threads u64) -> *spray_pqueue_t
+def spray_pq_create (threads u64) -> *spray_pq_t
 begin
-    var config = spray_pqueue_config_paper(threads);
-    var spray_pqueue = new spray_pqueue_t;
+    var config = spray_pq_config_paper(threads);
+    var spray_pqueue = new spray_pq_t;
     spray_pqueue.config = config;
     spray_pqueue.head.priority = 0x8000000000000000I64;
     spray_pqueue.head.state = PADDING;
@@ -128,7 +128,7 @@ end
 /** Add a node, lock-free, to the priority queue.
  */
 export
-def spray_pqueue_add (seed *u64, set *spray_pqueue_t, priority i64) -> bool
+def spray_pq_add (seed *u64, set *spray_pq_t, priority i64) -> bool
 begin
     var preds [20]*node_t;
     var succs [20]*node_t;
@@ -168,7 +168,7 @@ end
 /** Remove a node, lock-free, from the skiplist.
  */
 export
-def spray_pqueue_remove (set *spray_pqueue_t, x i64) -> bool
+def spray_pq_remove (set *spray_pq_t, x i64) -> bool
 begin
     var preds [20]*node_t;
     var succs [20]*node_t;
@@ -215,7 +215,7 @@ end
 /** Remove a node, lock-free, from the skiplist.  Leak the memory.
  */
 export
-def spray_pqueue_leaky_remove (set *spray_pqueue_t, x i64) -> bool
+def spray_pq_leaky_remove (set *spray_pq_t, x i64) -> bool
 begin
     var preds [20]*node_t;
     var succs [20]*node_t;
@@ -260,14 +260,14 @@ end
 /** Remove a node, lock-free, from the skiplist.
  */
 export
-def spray_pqueue_pop_min (seed *u64, set *spray_pqueue_t) -> bool
+def spray_pq_pop_min (seed *u64, set *spray_pq_t) -> bool
 begin
   while true do
     var cleaner = (fast_rand(seed) % (set.config.thread_count + 1)) == 0;
     if cleaner then
         for var curr = unmark(set.head.next[0]); curr != &set.tail; curr = unmark(curr.next[0]) do
             if curr.state == DELETED then
-                spray_pqueue_remove(set, curr.priority);
+                spray_pq_remove(set, curr.priority);
             fi
         od
     fi
@@ -295,14 +295,14 @@ end
 /** Remove a node, lock-free, from the skiplist.  Leak the memory.
  */
 export
-def spray_pqueue_leaky_pop_min (seed *u64, set *spray_pqueue_t) -> bool
+def spray_pq_leaky_pop_min (seed *u64, set *spray_pq_t) -> bool
 begin
   while true do
     var cleaner = (fast_rand(seed) % (set.config.thread_count + 1)) == 0;
     if cleaner then
         for var curr = unmark(set.head.next[0]); curr != &set.tail; curr = unmark(curr.next[0]) do
             if curr.state == DELETED then
-                spray_pqueue_leaky_remove(set, curr.priority);
+                spray_pq_leaky_remove(set, curr.priority);
             fi
         od
     fi
@@ -349,7 +349,7 @@ begin
     return level - 1;
 end
 
-def spray (seed *u64, set *spray_pqueue_t) -> *node_t
+def spray (seed *u64, set *spray_pq_t) -> *node_t
 begin
   var cur_node *node_t = set.padding_head;
   var D = set.config.descend_amount;
@@ -370,7 +370,7 @@ begin
   return cur_node;
 end 
 
-def find (set *spray_pqueue_t, priority i64, preds [20]*node_t, succs [20]*node_t) -> bool
+def find (set *spray_pq_t, priority i64, preds [20]*node_t, succs [20]*node_t) -> bool
 begin
     var marked, snip bool;
     var pred, curr, succ *node_t = nil, nil, nil;

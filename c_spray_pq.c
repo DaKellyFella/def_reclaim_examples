@@ -4,7 +4,7 @@
  * The data-structure is lock-free and has relaxed correctness semantics.
  */
 
-#include "c_spray_pqueue.h"
+#include "c_spray_pq.h"
 
 #include <stdbool.h>
 #include <forkscan.h>
