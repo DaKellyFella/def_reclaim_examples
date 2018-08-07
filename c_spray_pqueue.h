@@ -10,28 +10,7 @@
 
 #define N 20
 
-enum STATE {PADDING, ACTIVE, DELETED};
-typedef enum STATE state_t;
-
-typedef struct _c_spray_pqueue_node_t {
-  int64_t key;
-  int32_t toplevel;
-  volatile state_t state;
-  struct _c_spray_pqueue_node_t volatile * volatile next[N];
-} c_spray_pqueue_node_t;
-
-typedef c_spray_pqueue_node_t volatile * volatile c_spray_pqueue_node_ptr;
-
-typedef struct _c_spray_pqueue_config_t {
-  int64_t thread_count, start_height, max_jump, descend_amount, padding_amount;
-} c_spray_pqueue_config_t;
-
-typedef struct _c_spray_pqueue_t {
-  c_spray_pqueue_config_t config;
-  c_spray_pqueue_node_ptr padding_head;
-  c_spray_pqueue_node_t head, tail;
-} c_spray_pqueue_t;
-
+typedef struct c_spray_pqueue_t c_spray_pqueue_t;
 
 c_spray_pqueue_t *c_spray_pqueue_create(int64_t threads);
 

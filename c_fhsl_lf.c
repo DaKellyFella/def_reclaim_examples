@@ -9,33 +9,46 @@
 #include <stdio.h>
 
 
-fhsl_lf_node_ptr c_fhsl_node_create(int64_t key, int32_t toplevel){
-  fhsl_lf_node_ptr node = forkscan_malloc(sizeof(fhsl_lf_node_t));
+typedef struct node_t node_t;
+typedef node_t volatile * volatile node_ptr;
+typedef struct node_unpacked_t node_unpacked_t;
+
+struct node_t {
+  int64_t key;
+  int32_t toplevel;
+  node_ptr next[N];
+};
+
+struct c_fhsl_lf_t {
+  node_t head, tail;
+};
+
+struct node_unpacked_t {
+  bool marked;
+  node_ptr address;
+};
+
+node_ptr node_create(int64_t key, int32_t toplevel){
+  node_ptr node = forkscan_malloc(sizeof(node_t));
   node->key = key;
   node->toplevel = toplevel;
   return node;
 }
 
-fhsl_lf_node_ptr fhsl_lf_node_unmark(fhsl_lf_node_ptr node){
-  return (fhsl_lf_node_ptr)(((size_t)node) & (~0x1));
+node_ptr fhsl_lf_node_unmark(node_ptr node){
+  return (node_ptr)(((size_t)node) & (~0x1));
 }
 
-fhsl_lf_node_ptr fhsl_lf_node_mark(fhsl_lf_node_ptr node){
-  return (fhsl_lf_node_ptr)((size_t)node | 0x1);
+node_ptr fhsl_lf_node_mark(node_ptr node){
+  return (node_ptr)((size_t)node | 0x1);
 }
 
-bool fhsl_lf_node_is_marked(fhsl_lf_node_ptr node){
+bool fhsl_lf_node_is_marked(node_ptr node){
   return fhsl_lf_node_unmark(node) != node;
 }
 
-
-typedef struct _c_fhsl_lf_node_unpacked_t {
-  bool marked;
-  fhsl_lf_node_ptr address;
-} c_fhsl_lf_node_unpacked_t;
-
-c_fhsl_lf_node_unpacked_t fhsl_lf_node_unpack(fhsl_lf_node_ptr node){
-  return (c_fhsl_lf_node_unpacked_t){
+node_unpacked_t fhsl_lf_node_unpack(node_ptr node){
+  return (node_unpacked_t){
     .marked = fhsl_lf_node_is_marked(node),
     .address = fhsl_lf_node_unmark(node)
     };
@@ -43,8 +56,8 @@ c_fhsl_lf_node_unpacked_t fhsl_lf_node_unpack(fhsl_lf_node_ptr node){
 
 /** Print out the contents of the skip list along with node heights.
  */
-void c_fhsl_lf_print (c_fhsl_lf_t *set){
-  fhsl_lf_node_ptr node = set->head.next[0];
+void lf_print (c_fhsl_lf_t *set){
+  node_ptr node = set->head.next[0];
   while(fhsl_lf_node_unmark(node) != &set->tail) {
     if(fhsl_lf_node_is_marked(node->next[0])) {
       node = fhsl_lf_node_unmark(node)->next[0];
@@ -72,9 +85,9 @@ c_fhsl_lf_t * c_fhsl_lf_create() {
 /** Return whether the skip list contains the value.
  */
 int c_fhsl_lf_contains(c_fhsl_lf_t *set, int64_t key) {
-  fhsl_lf_node_ptr node = &set->head;
+  node_ptr node = &set->head;
   for(int64_t i = N - 1; i >= 0; i--) {
-    fhsl_lf_node_ptr next = fhsl_lf_node_unmark(node->next[i]);
+    node_ptr next = fhsl_lf_node_unmark(node->next[i]);
     while(next->key <= key) {
       node = next;
       next = fhsl_lf_node_unmark(node->next[i]);
@@ -107,16 +120,16 @@ static int32_t random_level (uint64_t *seed, int32_t max) {
 }
 
 static bool find(c_fhsl_lf_t *set, int64_t key, 
-  fhsl_lf_node_ptr preds[N], fhsl_lf_node_ptr succs[N]) {
+  node_ptr preds[N], node_ptr succs[N]) {
   bool marked, snip;
-  fhsl_lf_node_ptr pred = NULL, curr = NULL, succ = NULL;
+  node_ptr pred = NULL, curr = NULL, succ = NULL;
 retry:
   while(true) {
     pred = &set->head;
     for(int64_t level = N - 1; level >= 0; --level) {
       curr = fhsl_lf_node_unmark(pred->next[level]);
       while(true) {
-        c_fhsl_lf_node_unpacked_t unpacked_node = fhsl_lf_node_unpack(curr->next[level]);
+        node_unpacked_t unpacked_node = fhsl_lf_node_unpack(curr->next[level]);
         succ = unpacked_node.address;
         marked = unpacked_node.marked;
         while(unpacked_node.marked) {
@@ -146,9 +159,9 @@ retry:
 /** Add a node, lock-free, to the skiplist.
  */
 int c_fhsl_lf_add(uint64_t *seed, c_fhsl_lf_t * set, int64_t key) {
-  fhsl_lf_node_ptr preds[N], succs[N];
+  node_ptr preds[N], succs[N];
   int32_t toplevel = random_level(seed, N);
-  fhsl_lf_node_ptr node = NULL;
+  node_ptr node = NULL;
   while(true) {
     if(find(set, key, preds, succs)) {
       if(node != NULL) {
@@ -156,11 +169,11 @@ int c_fhsl_lf_add(uint64_t *seed, c_fhsl_lf_t * set, int64_t key) {
       }
       return false;
     }
-    if(node == NULL) { node = c_fhsl_node_create(key, toplevel); }
+    if(node == NULL) { node = node_create(key, toplevel); }
     for(int64_t i = 0; i <= toplevel; ++i) {
       node->next[i] = fhsl_lf_node_unmark(succs[i]);
     }
-    fhsl_lf_node_ptr pred = preds[0], succ = succs[0];
+    node_ptr pred = preds[0], succ = succs[0];
     if(!__sync_bool_compare_and_swap(&pred->next[0], fhsl_lf_node_unmark(succ), node)) {
       continue;
     }
@@ -181,13 +194,13 @@ int c_fhsl_lf_add(uint64_t *seed, c_fhsl_lf_t * set, int64_t key) {
 /** Remove a node, lock-free, from the skiplist.
  */
 int c_fhsl_lf_remove_leaky(c_fhsl_lf_t * set, int64_t key) {
-  fhsl_lf_node_ptr preds[N], succs[N];
-  fhsl_lf_node_ptr succ = NULL;
+  node_ptr preds[N], succs[N];
+  node_ptr succ = NULL;
   while(true) {
     if(!find(set, key, preds, succs)) {
       return false;
     }
-    fhsl_lf_node_ptr node_to_remove = succs[0];
+    node_ptr node_to_remove = succs[0];
     bool marked;
     for(int64_t level = node_to_remove->toplevel; level >= 1; --level) {
       succ = node_to_remove->next[level];
@@ -213,39 +226,5 @@ int c_fhsl_lf_remove_leaky(c_fhsl_lf_t * set, int64_t key) {
         return false;
       }
     }
-  }
-}
-
-/** Pop the front node from the list.  Return true iff there was a node to pop.
- *  Leak the memory.
- */
-int c_fhsl_lf_leaky_pop_min(c_fhsl_lf_t * set) {
-  fhsl_lf_node_ptr preds[N], succs[N];
-  fhsl_lf_node_ptr succ;
-  while(true) {
-    fhsl_lf_node_ptr node_to_remove = set->head.next[0];
-    if(node_to_remove == &set->tail) {
-      return false;
-    }
-    for(int64_t level = node_to_remove->toplevel; level >= 0; --level) {
-      preds[level] = &set->head;
-      succs[level] = node_to_remove;
-    }
-    for(int64_t level = node_to_remove->toplevel; level >= 1; --level) {
-      succ = node_to_remove->next[level];
-      bool marked = fhsl_lf_node_is_marked(succ);
-      while(!marked) {
-        __sync_bool_compare_and_swap(&node_to_remove->next[level],
-          fhsl_lf_node_unmark(succ), fhsl_lf_node_mark(succ));
-        succ = node_to_remove->next[level];
-        marked = fhsl_lf_node_is_marked(succ);
-      }
-    }
-    succ = node_to_remove->next[0];
-    if(__sync_bool_compare_and_swap(&node_to_remove->next[0],
-      fhsl_lf_node_unmark(succ), fhsl_lf_node_mark(succ))) {
-        find(set, node_to_remove->key, preds, succs);
-        return true;
-      }
   }
 }

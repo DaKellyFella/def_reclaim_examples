@@ -111,7 +111,7 @@ int c_mmht_remove_leaky(c_mmht_t * set, key_t key) {
     if(!__sync_bool_compare_and_swap(&view.current->next, view.next, mark(view.next))) {
       continue;
     }
-    if(!__sync_bool_compare_and_swap(view.previous, view.current, view.next)) {
+    if(!__sync_bool_compare_and_swap(view.previous, view.current, unmark(view.next))) {
       find(&view, &set->table[bucket], key);
     }
     return true;

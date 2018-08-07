@@ -3,67 +3,81 @@
 #include <forkscan.h>
 
 
-typedef struct _seek_record_t {
-    c_bt_lf_node_ptr ancestor, successor, parent, leaf;
-} seek_record_t;
+typedef struct node_t node_t;
+typedef node_t volatile * volatile node_ptr;
+typedef struct seek_record_t seek_record_t;
+typedef struct node_unpacked_t node_unpacked_t;
+
+struct node_t {
+    int64_t key;
+    node_ptr left, right;
+};
+
+struct c_btlf_t {
+    node_ptr R, S;
+};
+
+struct seek_record_t {
+    node_ptr ancestor, successor, parent, leaf;
+};
 
 enum REMOVE_STATE {INJECTION, CLEANUP};
 
-typedef struct _c_bt_lf_node_unpacked_t {
+struct node_unpacked_t {
     bool flagged, tagged;
-    c_bt_lf_node_ptr address;
-} c_bt_lf_node_unpacked_t;
+    node_ptr address;
+};
 
-c_bt_lf_node_t* c_bt_lf_node_create(int64_t key){
-    c_bt_lf_node_t* node = forkscan_malloc(sizeof(c_bt_lf_node_t));
+node_t* c_bt_lf_node_create(int64_t key){
+    node_t* node = forkscan_malloc(sizeof(node_t));
     node->key = key;
     node->left = NULL;
     node->right = NULL;
     return node;
 }
 
-c_bt_lf_node_ptr c_bt_lf_node_address(c_bt_lf_node_ptr node){
-    return (c_bt_lf_node_ptr)(((size_t)node) & (~0x3));
+node_ptr c_bt_lf_node_address(node_ptr node){
+    return (node_ptr)(((size_t)node) & (~0x3));
 }
 
-c_bt_lf_node_ptr c_bt_lf_node_flag(c_bt_lf_node_ptr node, bool flag){
+node_ptr c_bt_lf_node_flag(node_ptr node, bool flag){
     if(flag){
-        return (c_bt_lf_node_ptr)((size_t)node | 0x1);
+        return (node_ptr)((size_t)node | 0x1);
     } else {
-        return (c_bt_lf_node_ptr)((size_t)node & (~0x1));
+        return (node_ptr)((size_t)node & (~0x1));
     }
 }
 
-bool c_bt_lf_node_is_flagged(c_bt_lf_node_ptr node){
+bool c_bt_lf_node_is_flagged(node_ptr node){
     return ((size_t)node & 0x1) == 1;
 }
 
-c_bt_lf_node_ptr c_bt_lf_node_tag(c_bt_lf_node_ptr node, bool tag){
+node_ptr c_bt_lf_node_tag(node_ptr node, bool tag){
     if(tag){
-        return (c_bt_lf_node_ptr)((size_t)node | 0x2);
+        return (node_ptr)((size_t)node | 0x2);
     } else {
-        return (c_bt_lf_node_ptr)((size_t)node & (~0x2));
+        return (node_ptr)((size_t)node & (~0x2));
     }
 }
 
-bool c_bt_lf_node_is_tagged(c_bt_lf_node_ptr node){
+bool c_bt_lf_node_is_tagged(node_ptr node){
     return ((size_t)node & 0x2) == 2;
 }
 
-c_bt_lf_node_ptr c_bt_lf_node_pack(c_bt_lf_node_ptr node, bool flag, bool tag){
+node_ptr c_bt_lf_node_pack(node_ptr node, bool flag, bool tag){
     return c_bt_lf_node_tag(c_bt_lf_node_flag(c_bt_lf_node_address(node), flag), tag);
 }
 
-c_bt_lf_node_unpacked_t c_bt_lf_node_unpack(c_bt_lf_node_ptr node){
-    return (c_bt_lf_node_unpacked_t){
+node_unpacked_t c_bt_lf_node_unpack(node_ptr node){
+    return (node_unpacked_t){
         .flagged = c_bt_lf_node_is_flagged(node),
         .tagged = c_bt_lf_node_is_tagged(node),
         .address = c_bt_lf_node_address(node)
         };
 }
 
-c_bt_lf_t* c_bt_lf_create(){
-    c_bt_lf_t * bt_lf = forkscan_malloc(sizeof(c_bt_lf_t));
+c_btlf_t* c_bt_lf_create(){
+    c_btlf_t * bt_lf = forkscan_malloc(sizeof(c_btlf_t));
     bt_lf->R = c_bt_lf_node_create(INT64_MAX);
     bt_lf->S = c_bt_lf_node_create(INT64_MAX - 1);
     bt_lf->R->left = bt_lf->S;
@@ -72,16 +86,16 @@ c_bt_lf_t* c_bt_lf_create(){
     return bt_lf;
 }
 
-void c_bt_lf_init_seek_record(c_bt_lf_t *bt_lf, seek_record_t* sr){
+void c_bt_lf_init_seek_record(c_btlf_t *bt_lf, seek_record_t* sr){
     sr->ancestor = bt_lf->R;
     sr->successor = bt_lf->S;
     sr->parent = bt_lf->S;
     sr->leaf = c_bt_lf_node_address(bt_lf->S->left);
 }
 
-c_bt_lf_node_ptr c_bt_lf_node_setup(int64_t key, int64_t sibbling_key, c_bt_lf_node_ptr sibbling_node){
-    c_bt_lf_node_t * node = c_bt_lf_node_create(key);
-    c_bt_lf_node_t * internal_node = c_bt_lf_node_create(key);
+node_ptr c_bt_lf_node_setup(int64_t key, int64_t sibbling_key, node_ptr sibbling_node){
+    node_t * node = c_bt_lf_node_create(key);
+    node_t * internal_node = c_bt_lf_node_create(key);
     if(key < sibbling_key){
         internal_node->left = node;
         internal_node->right = sibbling_node;
@@ -93,11 +107,11 @@ c_bt_lf_node_ptr c_bt_lf_node_setup(int64_t key, int64_t sibbling_key, c_bt_lf_n
     return internal_node;
 }
 
-void c_bt_lf_seek(c_bt_lf_t * set, seek_record_t * sr, int64_t key){
+void c_bt_lf_seek(c_btlf_t * set, seek_record_t * sr, int64_t key){
     c_bt_lf_init_seek_record(set, sr);
-    volatile c_bt_lf_node_t * parent_field = sr->parent->left;
-    volatile c_bt_lf_node_t * current_field = sr->leaf->left;
-    volatile c_bt_lf_node_t * current = c_bt_lf_node_address(current_field);
+    volatile node_t * parent_field = sr->parent->left;
+    volatile node_t * current_field = sr->leaf->left;
+    volatile node_t * current = c_bt_lf_node_address(current_field);
 
     while(current != NULL){
         if(!c_bt_lf_node_is_tagged(parent_field)){
@@ -116,19 +130,19 @@ void c_bt_lf_seek(c_bt_lf_t * set, seek_record_t * sr, int64_t key){
     }
 }
 
-bool c_bt_lf_cleanup(c_bt_lf_t * set, seek_record_t *sr, int64_t key) {
-    c_bt_lf_node_ptr ancestor = sr->ancestor, successor = sr->successor, parent = sr->parent, leaf = sr->leaf;
+bool c_bt_lf_cleanup(c_btlf_t * set, seek_record_t *sr, int64_t key) {
+    node_ptr ancestor = sr->ancestor, successor = sr->successor, parent = sr->parent, leaf = sr->leaf;
 
-    c_bt_lf_node_ptr volatile* successor_address = NULL;
+    node_ptr volatile* successor_address = NULL;
     if(key < ancestor->key) {
         successor_address = &ancestor->left;
     } else {
         successor_address = &ancestor->right;
     }
-    c_bt_lf_node_ptr child_val = NULL;
-    c_bt_lf_node_ptr volatile* child_address = NULL;
-    c_bt_lf_node_ptr sibling_val = NULL;
-    c_bt_lf_node_ptr volatile* sibling_address = NULL;
+    node_ptr child_val = NULL;
+    node_ptr volatile* child_address = NULL;
+    node_ptr sibling_val = NULL;
+    node_ptr volatile* sibling_address = NULL;
     if(key < parent->key) {
         child_val = parent->left;
         child_address = &parent->left;
@@ -140,7 +154,7 @@ bool c_bt_lf_cleanup(c_bt_lf_t * set, seek_record_t *sr, int64_t key) {
         sibling_val = parent->left;
         sibling_address = &parent->left;
     }
-    c_bt_lf_node_unpacked_t unpacked_node = c_bt_lf_node_unpack(*child_address);
+    node_unpacked_t unpacked_node = c_bt_lf_node_unpack(*child_address);
     if(!unpacked_node.flagged) {
         sibling_val = child_val;
         sibling_address = child_address;
@@ -149,36 +163,36 @@ bool c_bt_lf_cleanup(c_bt_lf_t * set, seek_record_t *sr, int64_t key) {
     __sync_bool_compare_and_swap(sibling_address,
         sibling_val,
         c_bt_lf_node_tag(c_bt_lf_node_address(sibling_val), true));
-    c_bt_lf_node_unpacked_t unpacked_sibbling = c_bt_lf_node_unpack(*sibling_address);
+    node_unpacked_t unpacked_sibbling = c_bt_lf_node_unpack(*sibling_address);
     bool result = __sync_bool_compare_and_swap(successor_address,
         c_bt_lf_node_address(successor),
         c_bt_lf_node_flag(unpacked_sibbling.address, unpacked_sibbling.flagged));
     return result;
 }
 
-int c_bt_lf_contains(c_bt_lf_t *set, int64_t key) {
+int c_bt_lf_contains(c_btlf_t *set, int64_t key) {
     seek_record_t sr;
     c_bt_lf_seek(set, &sr, key);
     return sr.leaf->key == key;
 }
 
 
-int c_bt_lf_add(c_bt_lf_t *set, int64_t key) {
+int c_bt_lf_add(c_btlf_t *set, int64_t key) {
     while(true) {
         seek_record_t sr;
         c_bt_lf_seek(set, &sr, key);
         int64_t leaf_key = sr.leaf->key;
         if(leaf_key != key) {
-            c_bt_lf_node_ptr parent = sr.parent;
-            c_bt_lf_node_ptr leaf = sr.leaf;
-            c_bt_lf_node_ptr volatile* child_address = NULL;
+            node_ptr parent = sr.parent;
+            node_ptr leaf = sr.leaf;
+            node_ptr volatile* child_address = NULL;
             int64_t parent_key = parent->key;
             if(key < parent_key) {
                 child_address = &parent->left;
             } else {
                 child_address = &parent->right;
             }
-            c_bt_lf_node_ptr internal_node = c_bt_lf_node_setup(key, leaf_key, leaf);
+            node_ptr internal_node = c_bt_lf_node_setup(key, leaf_key, leaf);
             bool result = __sync_bool_compare_and_swap(child_address,
                 c_bt_lf_node_address(leaf),
                 internal_node);
@@ -191,7 +205,7 @@ int c_bt_lf_add(c_bt_lf_t *set, int64_t key) {
                     forkscan_free((void *)internal_node->right);
                 }
                 forkscan_free((void *)internal_node);
-                c_bt_lf_node_unpacked_t unpacked_node = c_bt_lf_node_unpack(*child_address);
+                node_unpacked_t unpacked_node = c_bt_lf_node_unpack(*child_address);
                 if(unpacked_node.address == leaf &&
                     (unpacked_node.flagged || unpacked_node.tagged)){
                     bool done = c_bt_lf_cleanup(set, &sr, key);
@@ -203,14 +217,14 @@ int c_bt_lf_add(c_bt_lf_t *set, int64_t key) {
     }
 }
 
-int c_bt_lf_remove_leaky(c_bt_lf_t * set, int64_t key) {
+int c_bt_lf_remove_leaky(c_btlf_t * set, int64_t key) {
     enum REMOVE_STATE mode = INJECTION;
-    c_bt_lf_node_ptr leaf = NULL;
+    node_ptr leaf = NULL;
     while(true) {
         seek_record_t sr;
         c_bt_lf_seek(set, &sr, key);
-        c_bt_lf_node_ptr parent = sr.parent;
-        c_bt_lf_node_ptr volatile* child_address = NULL;
+        node_ptr parent = sr.parent;
+        node_ptr volatile* child_address = NULL;
         int64_t parent_key = parent->key;
         if(key < parent_key) {
             child_address = &parent->left;
@@ -232,7 +246,7 @@ int c_bt_lf_remove_leaky(c_bt_lf_t * set, int64_t key) {
                     return true;
                 }
             } else {
-                c_bt_lf_node_unpacked_t unpacked_node = c_bt_lf_node_unpack(*child_address);
+                node_unpacked_t unpacked_node = c_bt_lf_node_unpack(*child_address);
                 if(unpacked_node.address == leaf &&
                     (unpacked_node.flagged || unpacked_node.tagged)){
                     bool done = c_bt_lf_cleanup(set, &sr, key);
@@ -251,14 +265,14 @@ int c_bt_lf_remove_leaky(c_bt_lf_t * set, int64_t key) {
     }
 }
 
-int c_bt_lf_remove_retire(c_bt_lf_t * set, int64_t key) {
+int c_bt_lf_remove_retire(c_btlf_t * set, int64_t key) {
     enum REMOVE_STATE mode = INJECTION;
-    c_bt_lf_node_ptr leaf = NULL;
+    node_ptr leaf = NULL;
     while(true) {
         seek_record_t sr;
         c_bt_lf_seek(set, &sr, key);
-        c_bt_lf_node_ptr parent = sr.parent;
-        c_bt_lf_node_ptr volatile* child_address = NULL;
+        node_ptr parent = sr.parent;
+        node_ptr volatile* child_address = NULL;
         int64_t parent_key = parent->key;
         if(key < parent_key) {
             child_address = &parent->left;
@@ -281,7 +295,7 @@ int c_bt_lf_remove_retire(c_bt_lf_t * set, int64_t key) {
                     return true;
                 }
             } else {
-                c_bt_lf_node_unpacked_t unpacked_node = c_bt_lf_node_unpack(*child_address);
+                node_unpacked_t unpacked_node = c_bt_lf_node_unpack(*child_address);
                 if(unpacked_node.address == leaf &&
                     (unpacked_node.flagged || unpacked_node.tagged)){
                     bool done = c_bt_lf_cleanup(set, &sr, key);

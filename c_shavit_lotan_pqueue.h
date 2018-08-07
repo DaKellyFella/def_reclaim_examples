@@ -10,19 +10,7 @@
 
 #define N 20
 
-
-typedef struct _c_shavit_lotan_pq_node_t {
-  int64_t key;
-  int32_t toplevel;
-  volatile int deleted;
-  struct _c_shavit_lotan_pq_node_t volatile * volatile next[N];
-} c_shavit_lotan_pq_node_t;
-
-typedef c_shavit_lotan_pq_node_t volatile * volatile c_shavit_lotan_pq_node_ptr;
-
-typedef struct _sl_pq_t {
-  c_shavit_lotan_pq_node_t head, tail;
-} c_shavit_lotan_pqueue_t;
+typedef struct c_shavit_lotan_pqueue_t c_shavit_lotan_pqueue_t;
 
 c_shavit_lotan_pqueue_t * c_shavit_lotan_pqueue_create();
 

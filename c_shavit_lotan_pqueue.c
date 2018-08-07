@@ -11,41 +11,55 @@
 #include <stdio.h>
 
 
-c_shavit_lotan_pq_node_ptr c_shavit_lotan_pq_node_create(int64_t key, int32_t toplevel){
-  c_shavit_lotan_pq_node_ptr node = forkscan_malloc(sizeof(c_shavit_lotan_pq_node_t));
+typedef struct node_t node_t; 
+typedef node_t volatile * volatile node_ptr;
+typedef struct node_unpacked_t node_unpacked_t;
+
+struct node_t {
+  int64_t key;
+  int32_t toplevel;
+  volatile int deleted;
+  node_ptr next[N];
+};
+
+struct c_shavit_lotan_pqueue_t {
+  node_t head, tail;
+};
+
+struct node_unpacked_t {
+  bool marked;
+  node_ptr address;
+};
+
+node_ptr c_shavit_lotan_pq_node_create(int64_t key, int32_t toplevel){
+  node_ptr node = forkscan_malloc(sizeof(node_t));
   node->key = key;
   node->toplevel = toplevel;
   node->deleted = false;
   return node;
 }
 
-c_shavit_lotan_pq_node_ptr sl_pqueue_node_unmark(c_shavit_lotan_pq_node_ptr node){
-  return (c_shavit_lotan_pq_node_ptr)(((size_t)node) & (~0x1));
+node_ptr sl_pqueue_node_unmark(node_ptr node){
+  return (node_ptr)(((size_t)node) & (~0x1));
 }
 
-c_shavit_lotan_pq_node_ptr sl_pqueue_node_mark(c_shavit_lotan_pq_node_ptr node){
-  return (c_shavit_lotan_pq_node_ptr)((size_t)node | 0x1);
+node_ptr sl_pqueue_node_mark(node_ptr node){
+  return (node_ptr)((size_t)node | 0x1);
 }
 
-bool sl_pqueue_node_is_marked(c_shavit_lotan_pq_node_ptr node){
+bool sl_pqueue_node_is_marked(node_ptr node){
   return sl_pqueue_node_unmark(node) != node;
 }
 
-
-typedef struct _c_shavit_lotan_pqueue_node_unpacked_t {
-  bool marked;
-  c_shavit_lotan_pq_node_ptr address;
-} c_shavit_lotan_pqueue_node_unpacked_t;
-
-c_shavit_lotan_pqueue_node_unpacked_t c_shavit_lotan_pqueue_node_unpack(c_shavit_lotan_pq_node_ptr node){
-  return (c_shavit_lotan_pqueue_node_unpacked_t){
+node_unpacked_t c_shavit_lotan_pqueue_node_unpack(node_ptr node){
+  return (node_unpacked_t){
     .marked = sl_pqueue_node_is_marked(node),
     .address = sl_pqueue_node_unmark(node)
     };
 }
 
 void c_shavit_lotan_pqueue_print (c_shavit_lotan_pqueue_t *set){
-  c_shavit_lotan_pq_node_ptr node = set->head.next[0];
+  node_ptr node = set->head.next[0];
   while(sl_pqueue_node_unmark(node) != &set->tail) {
     if(sl_pqueue_node_is_marked(node->next[0])) {
       node = sl_pqueue_node_unmark(node)->next[0];
@@ -91,16 +105,16 @@ static int32_t random_level (uint64_t *seed, int32_t max) {
 }
 
 static bool find(c_shavit_lotan_pqueue_t *set, int64_t key, 
-  c_shavit_lotan_pq_node_ptr preds[N], c_shavit_lotan_pq_node_ptr succs[N]) {
+  node_ptr preds[N], node_ptr succs[N]) {
   bool marked, snip;
-  c_shavit_lotan_pq_node_ptr pred = NULL, curr = NULL, succ = NULL;
+  node_ptr pred = NULL, curr = NULL, succ = NULL;
 retry:
   while(true) {
     pred = &set->head;
     for(int64_t level = N - 1; level >= 0; --level) {
       curr = sl_pqueue_node_unmark(pred->next[level]);
       while(true) {
-        c_shavit_lotan_pqueue_node_unpacked_t unpacked_node = c_shavit_lotan_pqueue_node_unpack(curr->next[level]);
+        node_unpacked_t unpacked_node = c_shavit_lotan_pqueue_node_unpack(curr->next[level]);
         succ = unpacked_node.address;
         marked = unpacked_node.marked;
         while(unpacked_node.marked) {
@@ -130,9 +144,9 @@ retry:
 /** Add a node, lock-free, to the Shavit Lotan priority queue.
  */
 int c_shavit_lotan_pqueue_add(uint64_t *seed, c_shavit_lotan_pqueue_t * set, int64_t key) {
-  c_shavit_lotan_pq_node_ptr preds[N], succs[N];
+  node_ptr preds[N], succs[N];
   int32_t toplevel = random_level(seed, N);
-  c_shavit_lotan_pq_node_ptr node = NULL;
+  node_ptr node = NULL;
   while(true) {
     if(find(set, key, preds, succs)) {
       if(node != NULL) {
@@ -144,7 +158,7 @@ int c_shavit_lotan_pqueue_add(uint64_t *seed, c_shavit_lotan_pqueue_t * set, int
     for(int64_t i = 0; i <= toplevel; ++i) {
       node->next[i] = sl_pqueue_node_unmark(succs[i]);
     }
-    c_shavit_lotan_pq_node_ptr pred = preds[0], succ = succs[0];
+    node_ptr pred = preds[0], succ = succs[0];
     if(!__sync_bool_compare_and_swap(&pred->next[0], sl_pqueue_node_unmark(succ), node)) {
       continue;
     }
@@ -165,13 +179,13 @@ int c_shavit_lotan_pqueue_add(uint64_t *seed, c_shavit_lotan_pqueue_t * set, int
 /** Remove a node, lock-free, from the skiplist.
  */
 int c_shavit_lotan_pqueue_remove_leaky(c_shavit_lotan_pqueue_t * set, int64_t key) {
-  c_shavit_lotan_pq_node_ptr preds[N], succs[N];
-  c_shavit_lotan_pq_node_ptr succ = NULL;
+  node_ptr preds[N], succs[N];
+  node_ptr succ = NULL;
   while(true) {
     if(!find(set, key, preds, succs)) {
       return false;
     }
-    c_shavit_lotan_pq_node_ptr node_to_remove = succs[0];
+    node_ptr node_to_remove = succs[0];
     bool marked;
     for(int64_t level = node_to_remove->toplevel; level >= 1; --level) {
       succ = node_to_remove->next[level];
@@ -204,7 +218,7 @@ int c_shavit_lotan_pqueue_remove_leaky(c_shavit_lotan_pqueue_t * set, int64_t ke
  */
 int c_shavit_lotan_pqueue_leaky_pop_min(c_shavit_lotan_pqueue_t * set) {
   while(true) {
-    c_shavit_lotan_pq_node_ptr curr = sl_pqueue_node_unmark(set->head.next[0]);
+    node_ptr curr = sl_pqueue_node_unmark(set->head.next[0]);
     if(curr == &set->tail) {
       return false;
     }
