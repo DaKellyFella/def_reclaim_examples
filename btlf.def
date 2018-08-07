@@ -269,7 +269,7 @@ begin
                 mode = CLEANUP;
                 var done = bt_lf_cleanup(set, &sr, key);
                 if done then
-                    retire(leaf);
+                    // retire(leaf);
                     return true;
                 fi
             else
@@ -281,12 +281,12 @@ begin
             fi
         else
             if sr.leaf != leaf then
-                retire(leaf);
+                // retire(leaf);
                 return true;
             else
                 var done = bt_lf_cleanup(set, &sr, key);
                 if done then
-                    retire(leaf);
+                    // retire(leaf);
                     return true;
                 fi
             fi

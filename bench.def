@@ -6,18 +6,20 @@ import "time.h";
 import "stdlib.h";
 
 // Set data structures:
-import "bt_lf.defi";
 import "fhsl_lf.defi";
-import "c_bt_lf.h";
 import "c_fhsl_lf.h";
+import "btlf.defi";
+import "c_btlf.h";
 import "c_maged_michael_table.h";
+import "c_split_order_table.h";
 
 typedef benchmark_t = enum
     | FHSL_LF
     | C_FHSL_LF
-    | BT_LF
-    | C_BT_LF
-    | C_MM_HT
+    | BTLF
+    | C_BTLF
+    | C_MMHT
+    | C_SOHT
     ;
 
 typedef memory_policy_t = enum
@@ -95,9 +97,10 @@ begin
     switch b with
     xcase FHSL_LF: return "fhsl_lf";
     xcase C_FHSL_LF: return "c_fhsl_lf";
-    xcase BT_LF: return "bt_lf";
-    xcase C_BT_LF: return "c_bt_lf";
-    xcase C_MM_HT: return "c_mm_ht";
+    xcase BTLF: return "btlf";
+    xcase C_BTLF: return "c_btlf";
+    xcase C_MMHT: return "c_mmht";
+    xcase C_SOHT: return "c_soht";
     xcase _: return "unknown benchmark";
     esac
     return "FIXME: need reachability detection after a switch.";
@@ -122,9 +125,10 @@ begin
     printf("  -b <benchmark>: Set the benchmark. (default = fhsl_lf)\n");
     printf("     * fhsl_lf: Fixed-height skip list; lock-free. Written in DEF.\n");
     printf("     * c_fhsl_b: Fixed-height skip list; lock-free. Written in C.\n");
-    printf("     * bt_lf: Use the lock-free binary tree written in DEF.\n");
-    printf("     * c_bt_lf: Use the lock-free binary tree written in C.\n");
-    printf("     * c_mm_ht: Use the Maged Michael lock-free hash table in C.\n");
+    printf("     * btlf: Use the lock-free binary tree written in DEF.\n");
+    printf("     * c_btlf: Use the lock-free binary tree written in C.\n");
+    printf("     * c_mmht: Use the Maged Michael lock-free hash table in C.\n");
+    printf("     * c_soht: Use the Split-Order lock-free hash table in C.\n");
     printf("  -p <mem_policy>: Set the memory policy. (default = leaky)\n");
     printf("     * leaky: Leak removed nodes.\n");
     printf("     * retire: Use Forkscan to reclaim removed nodes.\n");
@@ -196,9 +200,10 @@ begin
             switch argv[i] with
             xcase "fhsl_lf": config.benchmark = FHSL_LF;
             xcase "c_fhsl_lf": config.benchmark = C_FHSL_LF;
-            xcase "bt_lf": config.benchmark = BT_LF;
-            xcase "c_bt_lf": config.benchmark = C_BT_LF;
-            xcase "c_mm_ht": config.benchmark = C_MM_HT;
+            xcase "btlf": config.benchmark = BTLF;
+            xcase "c_btlf": config.benchmark = C_BTLF;
+            xcase "c_mmht": config.benchmark = C_MMHT;
+            xcase "c_soht": config.benchmark = C_SOHT;
             xcase _:
                 printf("unknown benchmark: %s\n", argv[i]);
                 exit(1);
@@ -260,9 +265,10 @@ begin
     switch { config.benchmark, config.policy } with
     xcase { FHSL_LF, POLICY_RETIRE }:
     ocase { C_FHSL_LF, POLICY_LEAKY }:
-    ocase { BT_LF, POLICY_RETIRE}:
-    ocase { C_BT_LF, POLICY_LEAKY}:
-    ocase { C_MM_HT, POLICY_LEAKY }:
+    ocase { BTLF, POLICY_RETIRE}:
+    ocase { C_BTLF, POLICY_LEAKY}:
+    ocase { C_MMHT, POLICY_LEAKY }:
+    ocase { C_SOHT, POLICY_LEAKY }:
     xcase _:
         printf("Unsupported configuration:\n");
         printf("  benchmark: %s\n  policy: %s\n",
@@ -421,7 +427,7 @@ begin
 /*                   lock-free binary tree written in DEF                  */
 /***************************************************************************/
 
-        xcase BT_LF:
+        xcase BTLF:
             if action < read_action then
                 stats.read_attempts++;
                 if bt_lf_contains(set, val) then
@@ -448,7 +454,7 @@ begin
 /***************************************************************************/
 /*                      lock-free binary tree written in C                 */
 /***************************************************************************/
-        xcase C_BT_LF:
+        xcase C_BTLF:
             if action < read_action then
                 stats.read_attempts++;
                 if 0 != c_bt_lf_contains(set, val) then
@@ -471,10 +477,11 @@ begin
                     exit(1);
                 esac
             fi
+
 /***************************************************************************/
 /*             Maged Michael lock-free hash table written in C             */
 /***************************************************************************/
-        xcase C_MM_HT:
+        xcase C_MMHT:
             if action < read_action then
                 stats.read_attempts++;
                 if 0 != c_mmht_contains(set, val) then
@@ -490,6 +497,33 @@ begin
                 switch policy with
                 xcase POLICY_LEAKY:
                     if 0 != c_mmht_remove_leaky(set, val) then
+                        stats.remove_successes++;
+                    fi
+                xcase _:
+                    printf("error: unsupported mem policy for benchmark.\n");
+                    exit(1);
+                esac
+            fi
+
+/***************************************************************************/
+/*             Maged Michael lock-free hash table written in C             */
+/***************************************************************************/
+        xcase C_SOHT:
+            if action < read_action then
+                stats.read_attempts++;
+                if 0 != c_soht_contains(set, val) then
+                    stats.read_successes++;
+                fi
+            elif action < add_action then
+                stats.insert_attempts++;
+                if 0 != c_soht_add(set, val) then
+                    stats.insert_successes++;
+                fi
+            else
+                stats.remove_attempts++;
+                switch policy with
+                xcase POLICY_LEAKY:
+                    if 0 != c_soht_remove_leaky(set, val) then
                         stats.remove_successes++;
                     fi
                 xcase _:
@@ -530,7 +564,7 @@ begin
             fi
         od
         config.set = cast(type *void, set);
-    xcase BT_LF:
+    xcase BTLF:
         var set = bt_lf_create();
         for var i = 0; i < config.init_size; ++i do
             var val = fast_rand(seed) % config.upper_bound;
@@ -539,7 +573,7 @@ begin
             fi 
         od
         config.set = set;
-    xcase C_BT_LF:
+    xcase C_BTLF:
         var set = c_bt_lf_create();
         for var i = 0; i < config.init_size; ++i do
             var val = fast_rand(seed) % config.upper_bound;
@@ -548,11 +582,20 @@ begin
             fi
         od
         config.set = set;
-    xcase C_MM_HT:
+    xcase C_MMHT:
         var set = c_mmht_create(config.upper_bound);
         for var i = 0; i < config.init_size; ++i do
             var val = fast_rand(seed) % config.upper_bound;
             if 0 == c_mmht_add(set, val) then
+                --i;
+            fi
+        od
+        config.set = set;
+    xcase C_SOHT:
+        var set = c_soht_create(config.upper_bound, 5);
+        for var i = 0; i < config.init_size; ++i do
+            var val = fast_rand(seed) % config.upper_bound;
+            if 0 == c_soht_add(set, val) then
                 --i;
             fi
         od
