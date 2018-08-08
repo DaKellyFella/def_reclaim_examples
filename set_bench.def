@@ -680,11 +680,8 @@ begin
         var set = so_ht_create(config.upper_bound, 5);
         for var i = 0; i < config.init_size; ++i do
             var val = fast_rand(seed) % config.upper_bound;
-            //printf("Adding %d\n", val);
             if !so_ht_add(set, val) then
                 --i;
-            //else
-            //  printf("added\n");
             fi
         od
         config.structure = set;
