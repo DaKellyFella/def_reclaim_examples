@@ -23,10 +23,6 @@ struct c_fhsl_lf_t {
   node_t head, tail;
 };
 
-struct node_unpacked_t {
-  bool marked;
-  node_ptr address;
-};
 
 static node_ptr node_create(int64_t key, int32_t toplevel){
   node_ptr node = forkscan_malloc(sizeof(node_t));
@@ -45,13 +41,6 @@ static node_ptr node_mark(node_ptr node){
 
 static bool node_is_marked(node_ptr node){
   return node_unmark(node) != node;
-}
-
-static node_unpacked_t node_unpack(node_ptr node){
-  return (node_unpacked_t){
-    .marked = node_is_marked(node),
-    .address = node_unmark(node)
-    };
 }
 
 /** Print out the contents of the skip list along with node heights.
@@ -89,7 +78,7 @@ int c_fhsl_lf_contains(c_fhsl_lf_t *set, int64_t key) {
   for(int64_t i = N - 1; i >= 0; i--) {
     node_ptr next = node_unmark(node->next[i]);
     while(next->key <= key) {
-      node = next;
+      node = next; 
       next = node_unmark(node->next[i]);
     }
     if(node->key == key) {
@@ -129,18 +118,17 @@ retry:
     for(int64_t level = N - 1; level >= 0; --level) {
       curr = node_unmark(pred->next[level]);
       while(true) {
-        node_unpacked_t unpacked_node = node_unpack(curr->next[level]);
-        succ = unpacked_node.address;
-        marked = unpacked_node.marked;
-        while(unpacked_node.marked) {
+        node_ptr raw_node = curr->next[level];
+        marked = node_is_marked(raw_node);
+        succ = node_unmark(raw_node);
+        while(marked) {
           snip = __sync_bool_compare_and_swap(&pred->next[level], curr, succ);
           if(!snip) {
             goto retry;
           }
-          curr = node_unmark(pred->next[level]);
-          unpacked_node = node_unpack(curr->next[level]);
-          succ = unpacked_node.address;
-          marked = unpacked_node.marked;
+          raw_node = pred->next[level];
+          marked = node_is_marked(raw_node);
+          succ = node_unmark(raw_node);
         }
         if(curr->key < key) {
           pred = curr;
@@ -164,9 +152,7 @@ int c_fhsl_lf_add(uint64_t *seed, c_fhsl_lf_t * set, int64_t key) {
   node_ptr node = NULL;
   while(true) {
     if(find(set, key, preds, succs)) {
-      if(node != NULL) {
-        forkscan_free((void*)node);
-      }
+      forkscan_free((void*)node);
       return false;
     }
     if(node == NULL) { node = node_create(key, toplevel); }
@@ -181,7 +167,7 @@ int c_fhsl_lf_add(uint64_t *seed, c_fhsl_lf_t * set, int64_t key) {
       while(true) {
         pred = preds[i], succ = succs[i];
         if(__sync_bool_compare_and_swap(&pred->next[i],
-          node_unmark(succ), node)){
+          node_unmark(succ), node)) {
           break;
         }
         find(set, key, preds, succs);
