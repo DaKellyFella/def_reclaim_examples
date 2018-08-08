@@ -1,0 +1,157 @@
+/* Lock-free seperate chaining hash table.
+ * From paper "High Performance Dynamic Lock-Free Hash Tables and List-Based Sets".
+ * Lock-free updates (contains,add/remove).
+*/
+
+import "stdio.h";
+
+typedef node =
+  {
+    key      i64,     // Key.
+    next    node_ptr    // Next.
+  };
+
+typedef node_ptr = volatile * volatile node;
+
+export opaque
+typedef mm_ht_t =
+  {
+    size  i64,
+    table *node_ptr
+  };
+
+typedef list_view_t =
+{
+  previous *node_ptr,
+  current node_ptr,
+  next node_ptr
+};
+
+def hash(key i64) -> i64
+begin
+  return cast(type i64, key);
+end
+
+
+def find(view *list_view_t, head volatile *node_ptr, key i64) -> bool
+begin
+  var nonsese = false;
+retry:
+  view.previous = head;
+  view.current = view.previous[0];
+  while true do
+    if unmark(view.current) == nil then return false; fi
+    view.next = unmark(view.current).next;
+    var cur_key = unmark(view.current).key;
+    if view.previous[0] != unmark(view.current) then 
+      goto retry;
+    fi
+    if !is_marked(view.current) then
+      if cur_key >= key then
+        return cur_key == key;
+      fi
+      view.previous = &unmark(view.current).next;
+    else
+      // Shortened down since it's leaky memory.
+      if !__builtin_cas(view.previous, view.current, view.next) then
+        goto retry;
+      fi
+    fi
+    view.current = view.next;
+  od
+end
+
+export
+def mm_ht_create(size i64) -> *mm_ht_t
+begin
+  var ret = new mm_ht_t;
+  ret.size = size;
+  ret.table = new[ret.size]node_ptr;
+  for var i i32 = 0; i < size; i++ do
+    ret.table[i] = nil;
+  od
+  return ret;
+end
+
+export
+def mm_ht_contains(set *mm_ht_t, key i64) -> bool
+begin
+  var key_hash = hash(key);
+  var bucket = key_hash % set.size;
+  var view list_view_t = {nil, nil, nil};
+  return find(&view, &set.table[bucket], key);
+end
+
+export
+def mm_ht_add(set *mm_ht_t, key i64) -> bool
+begin
+  var key_hash = hash(key);
+  var bucket i64 = key_hash % set.size;
+  var new_node = new node;
+  new_node.key = key;
+  while true do
+    var view list_view_t = {nil, nil, nil};
+    if find(&view, &set.table[bucket], key) then
+      delete new_node;
+      return false;
+    fi
+    new_node.next = unmark(view.current);
+    if __builtin_cas(view.previous, view.current, new_node) then
+      return true;
+    fi
+  od
+end
+
+export
+def mm_ht_remove_retire(set *mm_ht_t, key i64) -> bool
+begin
+  var key_hash = hash(key);
+  var bucket i64 = key_hash % set.size;
+  while true do
+    var view list_view_t = {nil, nil, nil};
+    if !find(&view, &set.table[bucket], key) then
+      return false;
+    fi
+    if !__builtin_cas(&view.current.next, view.next, mark(view.next)) then
+      continue;
+    fi
+    if !__builtin_cas(view.previous, view.current, unmark(view.next)) then
+      find(&view, &set.table[bucket], key);
+    else
+      retire view.current;
+    fi
+    return true;
+  od
+end
+
+export
+def mm_ht_remove_leaky(set *mm_ht_t, key i64) -> bool
+begin
+  var key_hash = hash(key);
+  var bucket i64 = key_hash % set.size;
+  while true do
+    var view list_view_t = {nil, nil, nil};
+    if !find(&view, &set.table[bucket], key) then
+      return false;
+    fi
+    if !__builtin_cas(&view.current.next, view.next, mark(view.next)) then
+      continue;
+    fi
+    if !__builtin_cas(view.previous, view.current, unmark(view.next)) then
+      find(&view, &set.table[bucket], key);
+    fi
+    return true;
+  od
+end
+
+def ref_and_markbit (ptr node_ptr) -> { node_ptr, bool } =
+  { unmark(ptr), is_marked(ptr) };
+
+def mark (ptr node_ptr) -> node_ptr =
+  cast(type node_ptr, 0x1I64 | cast(type i64, ptr));
+
+def unmark (ptr node_ptr) -> node_ptr =
+  cast(type node_ptr, 0xFFFFFFFFFFFFFFFEI64 & cast(type i64, ptr));
+
+def is_marked (ptr node_ptr) -> bool =
+  cast(type bool, 0x1I64 & cast(type i64, ptr));

@@ -269,7 +269,7 @@ begin
                 mode = CLEANUP;
                 var done = bt_lf_cleanup(set, &sr, key);
                 if done then
-                    // retire(leaf);
+                    retire(leaf);
                     return true;
                 fi
             else
@@ -281,12 +281,60 @@ begin
             fi
         else
             if sr.leaf != leaf then
-                // retire(leaf);
+                retire(leaf);
                 return true;
             else
                 var done = bt_lf_cleanup(set, &sr, key);
                 if done then
-                    // retire(leaf);
+                    retire(leaf);
+                    return true;
+                fi
+            fi
+        fi
+    od
+end
+
+export
+def bt_lf_remove_leaky(set *bt_lf_t, key i64) -> bool
+begin
+    var mode = INJECTION;
+    var leaf node_ptr = nil;
+    while true do
+        var sr seek_record_t;
+        bt_lf_seek(set, &sr, key);
+        var parent = sr.parent;
+        var child_address volatile * node_ptr = nil;
+        if key < parent.key then
+            child_address = &parent.left;
+        else
+            child_address = &parent.right;
+        fi
+        if mode == INJECTION then
+            leaf = sr.leaf;
+            if leaf.key != key then
+                return false;
+            fi
+            var result = __builtin_cas(child_address,
+                node_address(leaf), node_flag(leaf, true));
+            if result then
+                mode = CLEANUP;
+                var done = bt_lf_cleanup(set, &sr, key);
+                if done then
+                    return true;
+                fi
+            else
+                var unpacked_node node_unpacked_t = node_unpack(child_address[0]);
+                if unpacked_node.address == leaf &&
+                    (unpacked_node.flagged || unpacked_node.tagged) then
+                    var done = bt_lf_cleanup(set, &sr, key);
+                fi
+            fi
+        else
+            if sr.leaf != leaf then
+                return true;
+            else
+                var done = bt_lf_cleanup(set, &sr, key);
+                if done then
                     return true;
                 fi
             fi

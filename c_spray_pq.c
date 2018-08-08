@@ -31,7 +31,7 @@ struct config_t {
   int64_t thread_count, start_height, max_jump, descend_amount, padding_amount;
 };
 
-struct c_spray_pqueue_t {
+struct c_spray_pq_t {
   config_t config;
   node_ptr padding_head;
   node_t head, tail;
@@ -42,7 +42,7 @@ struct node_unpacked_t {
   node_ptr address;
 };
 
-node_ptr c_spray_pqueue_node_create(int64_t key, int32_t toplevel, state_t state){
+node_ptr node_create(int64_t key, int32_t toplevel, state_t state){
   node_ptr node = forkscan_malloc(sizeof(node_t));
   node->key = key;
   node->toplevel = toplevel;
@@ -50,26 +50,26 @@ node_ptr c_spray_pqueue_node_create(int64_t key, int32_t toplevel, state_t state
   return node;
 }
 
-node_ptr c_spray_pqueue_node_unmark(node_ptr node){
+node_ptr node_unmark(node_ptr node){
   return (node_ptr)(((size_t)node) & (~0x1));
 }
 
-node_ptr c_spray_pqueue_node_mark(node_ptr node){
+node_ptr node_mark(node_ptr node){
   return (node_ptr)((size_t)node | 0x1);
 }
 
-bool c_spray_pqueue_node_is_marked(node_ptr node){
-  return c_spray_pqueue_node_unmark(node) != node;
+bool node_is_marked(node_ptr node){
+  return node_unmark(node) != node;
 }
 
 node_unpacked_t c_spray_pqueue_node_unpack(node_ptr node){
   return (node_unpacked_t){
-    .marked = c_spray_pqueue_node_is_marked(node),
-    .address = c_spray_pqueue_node_unmark(node)
+    .marked = node_is_marked(node),
+    .address = node_unmark(node)
     };
 }
 
-config_t c_spray_pqueue_config_paper(int64_t threads) {
+config_t c_spray_pq_config_paper(int64_t threads) {
   int64_t log_arg = threads;
   if(threads == 1) { log_arg = 2; }
   return (config_t) {
@@ -83,9 +83,9 @@ config_t c_spray_pqueue_config_paper(int64_t threads) {
 
 /** Return a new spray list with parameters tuned to some specified thread count.
  */
-c_spray_pqueue_t* c_spray_pqueue_create(int64_t threads) {
-  c_spray_pqueue_t* spray_pqueue = forkscan_malloc(sizeof(c_spray_pqueue_t));
-  spray_pqueue->config = c_spray_pqueue_config_paper(threads);
+c_spray_pq_t* c_spray_pq_create(int64_t threads) {
+  c_spray_pq_t* spray_pqueue = forkscan_malloc(sizeof(c_spray_pq_t));
+  spray_pqueue->config = c_spray_pq_config_paper(threads);
   spray_pqueue->head.key = INT64_MIN;
   spray_pqueue->head.state = PADDING;
   spray_pqueue->tail.key = INT64_MAX;
@@ -130,13 +130,13 @@ static int32_t random_level (uint64_t *seed, int32_t max) {
 /* Perform the spray operation in the skiplist, looking for a node to attempt
  * to dequeue from the priority queue.
  */
-static node_ptr spray(uint64_t * seed, c_spray_pqueue_t * set) {
+static node_ptr spray(uint64_t * seed, c_spray_pq_t * set) {
   node_ptr cur_node = set->padding_head;
   int64_t D = set->config.descend_amount;
   for(int64_t H = set->config.start_height; H >= 0; H = H - D) {
     int64_t jump = (fast_rand(seed) % set->config.max_jump) + 1;
     while(jump-- > 0) {
-      node_ptr next = c_spray_pqueue_node_unmark(cur_node->next[H]);
+      node_ptr next = node_unmark(cur_node->next[H]);
       if(next == NULL) {
         break;
       }
@@ -158,7 +158,7 @@ static void print_node(node_ptr node) {
 
 }
 
-void c_spray_pqueue_print (c_spray_pqueue_t *set) {
+void c_spray_pq_print (c_spray_pq_t *set) {
   // Padding
   for(node_ptr curr = set->padding_head;
     curr != &set->head;
@@ -168,16 +168,16 @@ void c_spray_pqueue_print (c_spray_pqueue_t *set) {
   // Head
   print_node(&set->head);
   // Everything in between
-  for(node_ptr curr = c_spray_pqueue_node_unmark(set->head.next[0]);
+  for(node_ptr curr = node_unmark(set->head.next[0]);
     curr != &set->tail;
-    curr = c_spray_pqueue_node_unmark(curr->next[0])) {
+    curr = node_unmark(curr->next[0])) {
     print_node(curr);
   }
   // Tail
   print_node(&set->tail);
 }
 
-static bool find(c_spray_pqueue_t *set, int64_t key, 
+static bool find(c_spray_pq_t *set, int64_t key, 
   node_ptr preds[N], node_ptr succs[N]) {
   bool marked, snip;
   node_ptr pred = NULL, curr = NULL, succ = NULL;
@@ -185,7 +185,7 @@ retry:
   while(true) {
     pred = &set->head;
     for(int64_t level = N - 1; level >= 0; --level) {
-      curr = c_spray_pqueue_node_unmark(pred->next[level]);
+      curr = node_unmark(pred->next[level]);
       while(true) {
         node_unpacked_t unpacked_node = c_spray_pqueue_node_unpack(curr->next[level]);
         succ = unpacked_node.address;
@@ -195,7 +195,7 @@ retry:
           if(!snip) {
             goto retry;
           }
-          curr = c_spray_pqueue_node_unmark(pred->next[level]);
+          curr = node_unmark(pred->next[level]);
           unpacked_node = c_spray_pqueue_node_unpack(curr->next[level]);
           succ = unpacked_node.address;
           marked = unpacked_node.marked;
@@ -216,7 +216,7 @@ retry:
 
 /** Add a node, lock-free, to the spraylist's skiplist.
  */
-int c_spray_pqueue_add(uint64_t *seed, c_spray_pqueue_t *set, int64_t key) {
+int c_spray_pq_add(uint64_t *seed, c_spray_pq_t *set, int64_t key) {
   node_ptr preds[N], succs[N];
   int32_t toplevel = random_level(seed, N);
   node_ptr node = NULL;
@@ -227,19 +227,19 @@ int c_spray_pqueue_add(uint64_t *seed, c_spray_pqueue_t *set, int64_t key) {
       }
       return false;
     }
-    if(node == NULL) { node = c_spray_pqueue_node_create(key, toplevel, ACTIVE); }
+    if(node == NULL) { node = node_create(key, toplevel, ACTIVE); }
     for(int64_t i = 0; i <= toplevel; ++i) {
-      node->next[i] = c_spray_pqueue_node_unmark(succs[i]);
+      node->next[i] = node_unmark(succs[i]);
     }
     node_ptr pred = preds[0], succ = succs[0];
-    if(!__sync_bool_compare_and_swap(&pred->next[0], c_spray_pqueue_node_unmark(succ), node)) {
+    if(!__sync_bool_compare_and_swap(&pred->next[0], node_unmark(succ), node)) {
       continue;
     }
     for(int64_t i = 1; i <= toplevel; i++) {
       while(true) {
         pred = preds[i], succ = succs[i];
         if(__sync_bool_compare_and_swap(&pred->next[i],
-          c_spray_pqueue_node_unmark(succ), node)) {
+          node_unmark(succ), node)) {
           break;
         }
         find(set, key, preds, succs);
@@ -251,7 +251,7 @@ int c_spray_pqueue_add(uint64_t *seed, c_spray_pqueue_t *set, int64_t key) {
 
 /** Remove a node, lock-free, from the spray-list's skiplist.
  */
-int c_spray_pqueue_remove_leaky(c_spray_pqueue_t *set, int64_t key) {
+int c_spray_pq_remove_leaky(c_spray_pq_t *set, int64_t key) {
   node_ptr preds[N], succs[N];
   node_ptr succ = NULL;
   while(true) {
@@ -262,21 +262,21 @@ int c_spray_pqueue_remove_leaky(c_spray_pqueue_t *set, int64_t key) {
     bool marked;
     for(int64_t level = node_to_remove->toplevel; level >= 1; --level) {
       succ = node_to_remove->next[level];
-      marked = c_spray_pqueue_node_is_marked(succ);
+      marked = node_is_marked(succ);
       while(!marked) {
         bool _ = __sync_bool_compare_and_swap(&node_to_remove->next[level],
-          c_spray_pqueue_node_unmark(succ), c_spray_pqueue_node_mark(succ));
+          node_unmark(succ), node_mark(succ));
         succ = node_to_remove->next[level];
-        marked = c_spray_pqueue_node_is_marked(succ);
+        marked = node_is_marked(succ);
       }
     }
     succ = node_to_remove->next[0];
-    marked = c_spray_pqueue_node_is_marked(succ);
+    marked = node_is_marked(succ);
     while(true) {
       bool i_marked_it = __sync_bool_compare_and_swap(&node_to_remove->next[0],
-        c_spray_pqueue_node_unmark(succ), c_spray_pqueue_node_mark(succ));
+        node_unmark(succ), node_mark(succ));
       succ = succs[0]->next[0];
-      marked = c_spray_pqueue_node_is_marked(succ);
+      marked = node_is_marked(succ);
       if(i_marked_it) {
         find(set, key, preds, succs);
         return true;
@@ -290,7 +290,7 @@ int c_spray_pqueue_remove_leaky(c_spray_pqueue_t *set, int64_t key) {
 /** Remove a the relaxed min node, lock-free, from the spray-list's skiplist
  * using the underlying spray method for node selection.
  */
-int c_spray_pqueue_leaky_pop_min(uint64_t *seed, c_spray_pqueue_t *set) {
+int c_spray_pq_leaky_pop_min(uint64_t *seed, c_spray_pq_t *set) {
   while(true) {
     bool cleaner = (fast_rand(seed) % (set->config.thread_count + 1)) == 0;
     if(cleaner) {
@@ -298,17 +298,17 @@ int c_spray_pqueue_leaky_pop_min(uint64_t *seed, c_spray_pqueue_t *set) {
       size_t dist = 0, limit = set->config.padding_amount * set->config.padding_amount;
       limit = limit < 30 ? 30 : limit;
       for(node_ptr curr =
-        c_spray_pqueue_node_unmark(set->head.next[0]);
+        node_unmark(set->head.next[0]);
         curr != &set->tail;
-        curr = c_spray_pqueue_node_unmark(curr->next[0]), dist++){
+        curr = node_unmark(curr->next[0]), dist++){
         if(curr->state == DELETED) {
-          c_spray_pqueue_remove_leaky(set, curr->key);
+          c_spray_pq_remove_leaky(set, curr->key);
         }
         if(dist == limit) {
           break;
         }
       }
-      //c_spray_pqueue_print(set);
+      //c_spray_pq_print(set);
     }
     bool empty = set->head.next[0] == &set->tail;
     if(empty) {

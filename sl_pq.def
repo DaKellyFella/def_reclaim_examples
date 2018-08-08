@@ -18,6 +18,15 @@ typedef node =
       next     [20]*node       // Follow-list of nodes.
     };
 
+def node_create(val i64, level i32) -> *node
+begin
+    var node = new node;
+    node.val = val;
+    node.toplevel = level;
+    node.state = ACTIVE;
+    return node;
+end
+
 export opaque
 typedef sl_pq_t =
     { head  node,
@@ -54,22 +63,20 @@ begin
     return slpq;
 end
 
-/** Add a node, lock-free, to the skiplist.
+/** Add a node, lock-free, to the Shavit Lotan priority queue.
  */
 export
 def sl_pq_add (seed *u64, set *sl_pq_t, x i64) -> bool
 begin
     var preds [20]*node;
     var succs [20]*node;
+    var node *node = nil;
     var toplevel = random_level(seed, 20);
     while true do
-        if true == find(set, x, preds, succs) then
+        if find(set, x, preds, succs) then
             return false;
         else
-            var node = new node;
-            node.val = x;
-            node.toplevel = toplevel;
-            node.state = ACTIVE;
+            if node == nil then node = node_create(x, toplevel); fi
             for var i = 0; i <= toplevel; ++i do
                 node.next[i] = unmark(succs[i]);
             od
@@ -103,7 +110,7 @@ begin
     var succs [20]*node;
     var succ *node;
     while true do
-        if false == find(set, x, preds, succs) then
+        if !find(set, x, preds, succs) then
             return false;
         else
             var node_to_remove = succs[0];
@@ -130,7 +137,7 @@ begin
                 marked = is_marked(succ);
                 if i_marked_it then
                     // FIXME: succs[0]?  Should retire node_to_remove?
-                    retire succs[0];
+                    retire node_to_remove;
                     find(set, x, preds, succs);
                     return true;
                 elif marked then

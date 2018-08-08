@@ -1,6 +1,7 @@
 DEF ?= def
 DEFGHI = defghi
-BENCH = bench
+SET_BENCH = set_bench
+PRIORITY_BENCH = priority_bench
 
 OPTLEVEL = -O3
 
@@ -10,35 +11,53 @@ DEFLIBS = -lpthread -lm
 CC = clang
 CFLAGS = $(OPTLEVEL) -mrtm
 
-DEF_STRUCTURES = \
+DEF_SETS = \
 	fhsl_lf.def \
 	bt_lf.def \
+	mm_ht.def \
+	so_ht.def
+
+DEF_PQUEUES = \
 	sl_pq.def \
 	spray_pq.def
 
-C_STRUCTURES = \
+C_SETS = \
 	c_fhsl_lf.c \
 	c_bt_lf.c \
-	c_sl_pq.c \
-	c_spray_pq.c \
 	c_mm_ht.c \
 	c_so_ht.c
 
-DEFIFILES = $(DEF_STRUCTURES:.def=.defi)
+C_PQUEUES = \
+	c_sl_pq.c \
+	c_spray_pq.c
 
-BENCH_SRC = $(DEF_STRUCTURES) $(C_STRUCTURES) bench.def
-BENCH_DEF_OBJ = $(BENCH_SRC:.def=.o)
-BENCH_OBJ = $(BENCH_DEF_OBJ:.c=.o)
+DEFIFILES = $(DEF_SETS:.def=.defi) $(DEF_PQUEUES:.def=.defi)
 
-all: $(BENCH)
+SET_SRC = $(DEF_SETS) $(C_SETS) set_bench.def
+SET_DEF_OBJ = $(SET_SRC:.def=.o)
+SET_OBJ = $(SET_DEF_OBJ:.c=.o)
+
+PQUEUE_SRC = $(DEF_PQUEUES) $(C_PQUEUES) priority_bench.def
+PQUEUE_DEF_OBJ = $(PQUEUE_SRC:.def=.o)
+PQUEUE_OBJ = $(PQUEUE_DEF_OBJ:.c=.o)
+
+all: $(SET_BENCH) $(PRIORITY_BENCH)
 
 $(BENCH): $(BENCH_OBJ)
 	$(DEF) -o $@ $(DEFFLAGS) $(DEFLIBS) $^
 
-clean:
-	rm -f $(BENCH) *.defi *.o
+$(SET_BENCH): $(SET_OBJ)
+	$(DEF) -o $@ $(DEFFLAGS) $(DEFLIBS) $^
 
-bench.o: $(DEFIFILES)
+$(PRIORITY_BENCH): $(PQUEUE_OBJ)
+	$(DEF) -o $@ $(DEFFLAGS) $(DEFLIBS) $^
+
+clean:
+	rm -f $(SET_BENCH) $(PRIORITY_BENCH) *.defi *.o
+
+set_bench.o: $(DEFIFILES)
+
+priority_bench.o: $(DEFIFILES)
 
 %.o: %.def
 	$(DEF) -o $@ $(DEFFLAGS) -c $<
