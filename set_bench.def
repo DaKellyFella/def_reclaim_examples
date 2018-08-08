@@ -345,13 +345,14 @@ end
 
 def print_csv (config *config_t, stats *stats_t, runtime f64) -> void
 begin
-    puts("# fields: name, benchmark, policy, threads, init_size, upper_bound, update_rate, ops/sec");
+    var keys *FILE = fopen("set_keys.csv", "w");
+    fputs("name, benchmark, policy, threads, init_size, upper_bound, update_rate, ops/sec\n", keys);
 
     var total_ops = stats.read_attempts
         + stats.insert_attempts
         + stats.remove_attempts;
-     
-    printf("pqueue_bench, %s, %s, %d, %lld, %lld, %d, %lld\n",
+    var data *FILE = fopen("set_data.csv", "a");
+    fprintf(data, "set_bench, %s, %s, %d, %lld, %lld, %d, %lld\n",
             string_of_benchmark(config.benchmark),
             string_of_policy(config.policy),
             config.thread_count,
@@ -634,7 +635,7 @@ begin
         var set = c_fhsl_lf_create();
         for var i = 0; i < config.init_size; ++i do
             var val = fast_rand(seed) % config.upper_bound;
-            if false == c_fhsl_lf_add(seed, set, val) then
+            if 0 == c_fhsl_lf_add(seed, set, val) then
                 --i;
             fi
         od

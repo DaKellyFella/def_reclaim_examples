@@ -56,7 +56,7 @@ static node_unpacked_t node_unpack(node_ptr node){
 
 /** Print out the contents of the skip list along with node heights.
  */
-static void lf_print (c_fhsl_lf_t *set){
+void c_fhsl_lf_print (c_fhsl_lf_t *set){
   node_ptr node = set->head.next[0];
   while(node_unmark(node) != &set->tail) {
     if(node_is_marked(node->next[0])) {
@@ -93,7 +93,7 @@ int c_fhsl_lf_contains(c_fhsl_lf_t *set, int64_t key) {
       next = node_unmark(node->next[i]);
     }
     if(node->key == key) {
-      return node_is_marked(node->next[0]);
+      return !node_is_marked(node->next[0]);
     }
   }
   return false;

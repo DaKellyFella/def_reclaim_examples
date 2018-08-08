@@ -302,12 +302,13 @@ end
 
 def print_csv (config *config_t, stats *stats_t, runtime f64) -> void
 begin
-    puts("# fields: name, benchmark, policy, threads, init_size, upper_bound, update_rate, ops/sec");
+    var keys *FILE = fopen("pqueue_keys.csv", "w");
+    fputs("name, benchmark, policy, threads, init_size, upper_bound, ops/sec\n", keys);
 
     var total_ops = stats.insert_attempts
         + stats.remove_attempts;
-     
-    printf("pqueue_bench, %s, %s, %d, %lld, %lld, %lld\n",
+    var data *FILE = fopen("pqueue_data.csv", "a");
+    fprintf(data, "pqueue_bench, %s, %s, %d, %lld, %lld, %lld\n",
             string_of_benchmark(config.benchmark),
             string_of_policy(config.policy),
             config.thread_count,

@@ -2,3 +2,4 @@
 *.defi
 set_bench
 priority_bench
+*.csv
