@@ -220,22 +220,18 @@ end
 export
 def sl_pq_pop_min (set *sl_pq_t) -> bool
 begin
-    while true do
-        var curr = unmark(set.head.next[0]);
-        if curr == &set.tail then
-            return false;
+    // FIXME: If "curr" from outside is used the code doesn't work.
+    for var curr = unmark(set.head.next[0]); curr != &set.tail; curr = unmark(curr.next[0]) do
+        if curr.state == DELETED then
+            continue;
         fi
-        for ; curr != &set.tail; curr = unmark(curr.next[0]) do
-            if curr.state == DELETED then
-                continue;
-            fi
-            var res = __builtin_cas(&curr.state, ACTIVE, DELETED);
-            if res then 
-                // Physically delete the node now.
-                return sl_pq_remove(set, curr.val);
-            fi
-        od
+        var res = __builtin_cas(&curr.state, ACTIVE, DELETED);
+        if res then
+            // Physically delete the node now.
+            return sl_pq_remove(set, curr.val);
+        fi
     od
+    return false;
 end
 
 def fast_rand (seed *u64) -> u64
