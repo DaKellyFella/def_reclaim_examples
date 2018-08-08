@@ -243,8 +243,10 @@ begin
 
     switch { config.benchmark, config.policy } with
     xcase { SL_PQ, POLICY_RETIRE }:
+    ocase { SL_PQ, POLICY_LEAKY }:
     ocase { C_SL_PQ, POLICY_LEAKY }:
     ocase { SPRAY, POLICY_RETIRE }:
+    ocase { SPRAY, POLICY_LEAKY }:
     ocase { C_SPRAY, POLICY_LEAKY }:
     xcase _:
         printf("Unsupported configuration:\n");
@@ -349,6 +351,11 @@ begin
                         stats.remove_successes++;
                         insert_action = true;
                     fi
+                else 
+                    if sl_pq_leaky_pop_min(queue) then
+                        stats.remove_successes++;
+                        insert_action = true;
+                    fi
                 fi
             fi
 /***************************************************************************/
@@ -384,6 +391,11 @@ begin
                 stats.remove_attempts++;
                 if policy == POLICY_RETIRE then
                     if spray_pq_pop_min(&seed, queue) then
+                        stats.remove_successes++;
+                        insert_action = true;
+                    fi
+                else
+                    if spray_pq_leaky_pop_min(&seed, queue) then
                         stats.remove_successes++;
                         insert_action = true;
                     fi

@@ -273,6 +273,7 @@ begin
 
     switch { config.benchmark, config.policy } with
     xcase { FHSL_LF, POLICY_RETIRE }:
+    ocase { FHSL_LF, POLICY_LEAKY }:
     ocase { C_FHSL_LF, POLICY_LEAKY }:
     ocase { BT_LF, POLICY_RETIRE }:
     ocase { BT_LF, POLICY_LEAKY }:
@@ -400,6 +401,10 @@ begin
                 switch policy with
                 xcase POLICY_RETIRE:
                     if fhsl_lf_remove(set, val) then
+                        stats.remove_successes++;
+                    fi
+                xcase POLICY_LEAKY:
+                    if fhsl_lf_leaky_remove(set, val) then
                         stats.remove_successes++;
                     fi
                 xcase _:
