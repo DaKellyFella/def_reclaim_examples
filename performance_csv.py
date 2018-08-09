@@ -65,8 +65,16 @@ lang_map = {
     'graph_style' : '^', 
     'graph_colour': 'crimson'
   },
-
 }
+
+def collate_threads(data):
+  thread_ops = {}
+  for datum in data:
+    (threads, ops) = datum
+    if not(threads in thread_ops):
+      thread_ops[threads] = []
+    thread_ops[threads].append(ops)
+  return thread_ops
 
 def create_line_plots(config, perf_results):
   fig = plt.figure()
@@ -80,13 +88,8 @@ def create_line_plots(config, perf_results):
   legends_list = []
   max_ops, min_ops = 0, 0
   for lang_config in lang_results:
-    thread_ops = {}
     (policy, raw_name, data) = lang_results[lang_config]
-    for datum in data:
-      (threads, ops) = datum
-      if not(threads in thread_ops):
-        thread_ops[threads] = []
-      thread_ops[threads].append(ops)
+    thread_ops = collate_threads(data)
     y_ticks = [0]
     y_error = [0]
     x_ticks = [0]
@@ -114,63 +117,74 @@ def create_calibrating_bar_plots(perf_results):
   for config in perf_results:
     (structure_name, lang_results) = perf_results[config]
     for lang_config in lang_results:
-      thread_ops = {}
       (policy, raw_name, data) = lang_results[lang_config]
-      for datum in data:
-        (threads, ops) = datum
-        if threads == 1:
-          print datum
+      thread_ops = collate_threads(data)
+      lang = structure_map[raw_name]['lang']
+      if lang == 'DEF' and policy == 'leaky':
+        def_results[structure_name] = mean(thread_ops[1])
+      else:
+        c_results[structure_name] = mean(thread_ops[1])
+  print '*' * 20
+  print def_results
+  print c_results
+  
   # Only 1 thread is necessary and only the leaky data-structures.
 
 
-def main(args):
+def parse_file(key, data):
+  key_file = key
+  data_file = data
+
+  keys = {}
+  with open(key_file, "r") as open_file:
+    for key_line in open_file:
+      for idx, key in enumerate(key_line.split(",")):
+        keys[key.strip()] = idx
+
+  raw_results = []
+  with open(data_file, "r") as open_file:
+    for result in open_file:
+      raw_results.append([x.strip() for x in result.split(",")])
+  
+  # Collate all the data.
+  perf_results = {}
+  for result in raw_results:
+    # Get config.
+    structure_key = result[keys['benchmark']]
+    structure_m = structure_map[structure_key]
+    structure_category = structure_m['structure_category']
+
+    config = structure_category
+    if 'update_rate' in keys:
+      config += " w update rate: " + result[keys['update_rate']] + '%'
+
+    if not(config in perf_results):
+      perf_results[config] = (structure_category, {})
+    _, category_results_map = perf_results[config]
+
+    policy = result[keys['policy']]
+    lang_config = structure_m['lang'] + ' ' + policy
+
+    if not(lang_config in category_results_map):
+      category_results_map[lang_config] = (policy, structure_key, [])
+    _, _, lang_policy_results = category_results_map[lang_config]
+    # Division to make into microseconds
+    lang_policy_results.append((int(result[keys['threads']]), float(result[keys['ops/sec']]) / 1000000))
+  return perf_results
+
+
+def main():
     
-    key_file = args[1]
-    data_file = args[2]
-
-    keys = {}
-    with open(key_file, "r") as open_file:
-      for key_line in open_file:
-        for idx, key in enumerate(key_line.split(",")):
-          keys[key.strip()] = idx
-
-    raw_results = []
-    with open(data_file, "r") as open_file:
-      for result in open_file:
-        raw_results.append([x.strip() for x in result.split(",")])
-    
-    # Collate all the data.
-    perf_results = {}
-    for result in raw_results:
-      # Get config.
-      structure_key = result[keys['benchmark']]
-      structure_m = structure_map[structure_key]
-      structure_category = structure_m['structure_category']
-
-      config = structure_category
-      if 'update_rate' in keys:
-        config += " w update rate: " + result[keys['update_rate']] + '%'
-
-      if not(config in perf_results):
-        perf_results[config] = (structure_category, {})
-      _, category_results_map = perf_results[config]
-
-      policy = result[keys['policy']]
-      lang_config = structure_m['lang'] + ' ' + policy
-
-      if not(lang_config in category_results_map):
-        category_results_map[lang_config] = (policy, structure_key, [])
-      _, _, lang_policy_results = category_results_map[lang_config]
-      # Division to make into microseconds
-      lang_policy_results.append((int(result[keys['threads']]), int(result[keys['ops/sec']]) / 1000000))
-
-    for config in perf_results:
-      create_line_plots(config, perf_results)
-    
-    create_calibrating_bar_plots(perf_results)
+  set_results = parse_file('set_keys.csv', 'set_data.csv')
+  for config in set_results:
+    create_line_plots(config, set_results)
+  
+  pqueue_results = parse_file('pqueue_keys.csv', 'pqueue_data.csv')
+  for config in pqueue_results:
+    create_line_plots(config, pqueue_results)
+  
+  create_calibrating_bar_plots(set_results)
     
    
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        exit(1)
-    main(sys.argv)
+  main()
