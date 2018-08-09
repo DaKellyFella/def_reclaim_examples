@@ -346,13 +346,13 @@ end
 def print_csv (config *config_t, stats *stats_t, runtime f64) -> void
 begin
     var keys *FILE = fopen("set_keys.csv", "w");
-    fputs("name, benchmark, policy, threads, init_size, upper_bound, update_rate, ops/sec\n", keys);
+    fputs("benchmark, policy, threads, init_size, upper_bound, update_rate, ops/sec\n", keys);
 
     var total_ops = stats.read_attempts
         + stats.insert_attempts
         + stats.remove_attempts;
     var data *FILE = fopen("set_data.csv", "a");
-    fprintf(data, "set_bench, %s, %s, %d, %lld, %lld, %d, %lld\n",
+    fprintf(data, "%s, %s, %d, %lld, %lld, %d, %lld\n",
             string_of_benchmark(config.benchmark),
             string_of_policy(config.policy),
             config.thread_count,

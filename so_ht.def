@@ -123,10 +123,7 @@ retry:
       fi
       view.previous = &unmark(view.current).next;
     elif !__builtin_cas(view.previous, view.current, view.next) then
-      // Shortened down since it's leaky memory.
-      //if !__builtin_cas(view.previous, view.current, view.next) then
         goto retry;
-      //fi
     fi
     view.current = view.next;
   od
@@ -206,7 +203,7 @@ begin
   var copy_bucket u64 = reverse_bits(bucket);
   for var mask u64 = 1; mask <= copy_bucket; mask = mask << 1 do
     if (copy_bucket & mask) == mask then
-      copy_bucket = copy_bucket & bitwise_not(mask);
+      copy_bucket = copy_bucket & ~mask;
       break;
     fi
   od
