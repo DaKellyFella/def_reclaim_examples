@@ -80,7 +80,7 @@ def collate_threads(data):
 
 def create_line_plots(config, perf_results):
   fig = plt.figure()
-  (structure_name, lang_results) = perf_results[config]
+  (structure_name, lang_results, filename) = perf_results[config]
   plt.title(config)
   plt.ylabel(r'Total Ops / $\mu$s')
   plt.xlabel('Thread Count')
@@ -110,14 +110,14 @@ def create_line_plots(config, perf_results):
   # plt.gca().yaxis.set_major_locator(loc)
   plt.legend(loc='best', fancybox=True, shadow=True, handles = legends_list, ncol = 3)
   
-  fig.savefig('./figures/' + config + '.pdf', bbox_inches='tight')
+  fig.savefig('./figures/' + filename + '.pdf', bbox_inches='tight')
 
 def create_calibrating_bar_plots(set_results, pqueue_results):
   # All structures into one bar plot.
   def_results = {}
   c_results = {}
   for config in set_results:
-    (structure_name, lang_results) = set_results[config]
+    (structure_name, lang_results, _) = set_results[config]
     for lang_config in lang_results:
       (policy, raw_name, data) = lang_results[lang_config]
       thread_ops = collate_threads(data)
@@ -128,7 +128,7 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
         c_results[structure_name] = mean(thread_ops[1])
   
   for config in pqueue_results:
-    (structure_name, lang_results) = pqueue_results[config]
+    (structure_name, lang_results, _) = pqueue_results[config]
     for lang_config in lang_results:
       (policy, raw_name, data) = lang_results[lang_config]
       thread_ops = collate_threads(data)
@@ -152,24 +152,26 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
     def_norms.append(100.0)
     c_norms.append((c_res / def_res) * 100.0)
   fig = plt.figure()
-  width = 0.35
+  width = 0.30
   ind = range(len(def_norms))
   off_ind = [x +width for x in ind]
   plt.title("Normalised data-structure performance.")
+  plt.grid(b=True, which='major', color='black', linestyle='-')
   ax = plt.gca()
-  bar1 = ax.bar(range(len(def_norms)), def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
-  bar2 = ax.bar(off_ind, c_norms, width, color=lang_map['C leaky']['graph_colour'])
-
-  ax.set_xlim(-width,len(ind)+width)
-  ax.set_ylim(0,130)
+  # bar1 = ax.bar(range(len(def_norms)), def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
+  bar2 = ax.bar(ind, c_norms, width, color=lang_map['C leaky']['graph_colour'])
+  loc = plticker.MultipleLocator(base=20) # this locator puts ticks at regular intervals
+  ax.yaxis.set_major_locator(loc)
+  # ax.set_xlim(-width,len(ind)+width)
+  ax.set_xlim(-width * 2,len(ind))
   ax.set_ylabel('Percentage')
   ax.set_title('C relative to DEF (both leaky)')
-  ax.set_xticks([x +width for x in ind])
+  ax.set_xticks([x + (width / 2) for x in ind])
   xtickNames = ax.set_xticklabels(structures)
   plt.setp(xtickNames, rotation=45, fontsize=10)
 
   ## add a legend
-  ax.legend( (bar1[0], bar2[0]), ('DEF', 'C') )
+  ax.legend( bar2, 'C' )
   plt.savefig('./figures/relativeperf.pdf', bbox_inches='tight')
 
 def parse_file(key, data):
@@ -196,12 +198,15 @@ def parse_file(key, data):
     structure_category = structure_m['structure_category']
 
     config = structure_category
+    filename = structure_category.replace(" ", "")
     if 'update_rate' in keys:
       config += " w update rate: " + result[keys['update_rate']] + '%'
+      if result[keys['update_rate']] == '10':
+        filename += "Light"
 
     if not(config in perf_results):
-      perf_results[config] = (structure_category, {})
-    _, category_results_map = perf_results[config]
+      perf_results[config] = (structure_category, {}, filename)
+    _, category_results_map, _ = perf_results[config]
 
     policy = result[keys['policy']]
     lang_config = structure_m['lang'] + ' ' + policy
