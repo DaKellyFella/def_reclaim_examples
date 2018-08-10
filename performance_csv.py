@@ -3,6 +3,8 @@ import sys, os, glob, re
 import matplotlib.ticker as plticker
 import matplotlib.pyplot as plt
 
+from textwrap import wrap
+
 def mean(numbers):
     return float(sum(numbers)) / max(len(numbers), 1)
 
@@ -55,11 +57,11 @@ structure_map = {
 lang_map = {
   'DEF leaky' : {
     'graph_style' : '*', 
-    'graph_colour': 'blue'
+    'graph_colour': 'green'
   },
   'C leaky' : {
     'graph_style' : 's', 
-    'graph_colour': 'green'
+    'graph_colour': 'blue'
   },
   'DEF retire' : {
     'graph_style' : '^', 
@@ -110,12 +112,12 @@ def create_line_plots(config, perf_results):
   
   fig.savefig('./figures/' + config + '.pdf', bbox_inches='tight')
 
-def create_calibrating_bar_plots(perf_results):
+def create_calibrating_bar_plots(set_results, pqueue_results):
   # All structures into one bar plot.
   def_results = {}
   c_results = {}
-  for config in perf_results:
-    (structure_name, lang_results) = perf_results[config]
+  for config in set_results:
+    (structure_name, lang_results) = set_results[config]
     for lang_config in lang_results:
       (policy, raw_name, data) = lang_results[lang_config]
       thread_ops = collate_threads(data)
@@ -124,12 +126,51 @@ def create_calibrating_bar_plots(perf_results):
         def_results[structure_name] = mean(thread_ops[1])
       else:
         c_results[structure_name] = mean(thread_ops[1])
-  print '*' * 20
-  print def_results
-  print c_results
   
-  # Only 1 thread is necessary and only the leaky data-structures.
+  for config in pqueue_results:
+    (structure_name, lang_results) = pqueue_results[config]
+    for lang_config in lang_results:
+      (policy, raw_name, data) = lang_results[lang_config]
+      thread_ops = collate_threads(data)
+      lang = structure_map[raw_name]['lang']
+      if lang == 'DEF' and policy == 'leaky':
+        def_results[structure_name] = mean(thread_ops[1])
+      else:
+        c_results[structure_name] = mean(thread_ops[1])
+  
+  structures = []
+  def_numbers = []
+  c_numbers = []
+  for structure in def_results:
+    structures.append('\n'.join(wrap(structure, 12)))
+    def_numbers.append(def_results[structure])
+    c_numbers.append(c_results[structure])
+  
+  def_norms = []
+  c_norms = []
+  for (def_res, c_res) in zip(def_numbers, c_numbers):
+    def_norms.append(100.0)
+    c_norms.append((c_res / def_res) * 100.0)
+  fig = plt.figure()
+  width = 0.35
+  ind = range(len(def_norms))
+  off_ind = [x +width for x in ind]
+  plt.title("Normalised data-structure performance.")
+  ax = plt.gca()
+  bar1 = ax.bar(range(len(def_norms)), def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
+  bar2 = ax.bar(off_ind, c_norms, width, color=lang_map['C leaky']['graph_colour'])
 
+  ax.set_xlim(-width,len(ind)+width)
+  ax.set_ylim(0,130)
+  ax.set_ylabel('Percentage')
+  ax.set_title('C relative to DEF (both leaky)')
+  ax.set_xticks([x +width for x in ind])
+  xtickNames = ax.set_xticklabels(structures)
+  plt.setp(xtickNames, rotation=45, fontsize=10)
+
+  ## add a legend
+  ax.legend( (bar1[0], bar2[0]), ('DEF', 'C') )
+  plt.savefig('./figures/relativeperf.pdf', bbox_inches='tight')
 
 def parse_file(key, data):
   key_file = key
@@ -183,7 +224,7 @@ def main():
   for config in pqueue_results:
     create_line_plots(config, pqueue_results)
   
-  create_calibrating_bar_plots(set_results)
+  create_calibrating_bar_plots(set_results, pqueue_results)
     
    
 if __name__ == '__main__':
