@@ -220,7 +220,7 @@ def parse_file(key, data):
 
 
 def main():
-  if not os.path.exists('figures;):
+  if not os.path.exists('figures'):
     os.makedirs('figures')
   set_results = parse_file('set_keys.csv', 'set_data.csv')
   for config in set_results:
