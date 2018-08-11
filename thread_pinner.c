@@ -87,15 +87,12 @@ thread_pinner_t * thread_pinner_create() {
       const struct cpuinfo_cluster *socket = sockets + current_socket;
       pinner->sockets[current_socket].socket_id = current_socket;
       populate_socket(&pinner->sockets[current_socket], socket);
-      // print_socket(&pinner->sockets[current_socket]);
   }
   return pinner;
 }
 
 static int pin_thread_to_socket(socket_t *socket, pthread_t thread) {
-  if(socket->current_processor == socket->num_processors) {
-    return 1;
-  }
+  if(socket->current_processor == socket->num_processors) { return 1; }
   cpu_set_t cpu_set;
   CPU_ZERO(&cpu_set);
   uint32_t core_id = socket->processor_queue[socket->current_processor++];
@@ -108,9 +105,7 @@ int pin_thread(thread_pinner_t * thread_pinner, pthread_t thread) {
     current_socket < thread_pinner->num_sockets;
     current_socket++) {
     if(pin_thread_to_socket(&thread_pinner->sockets[current_socket],
-      thread)) {
-      return 0;
-    }
+      thread)) { return 0; }
   }
   return 1;
 }
