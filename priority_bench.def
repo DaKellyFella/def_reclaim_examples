@@ -4,6 +4,7 @@ import "pthread.h";
 import "stdio.h";
 import "time.h";
 import "stdlib.h";
+import "thread_pinner.h";
 
 // Pqueue data structures:
 import "sl_pq.defi";
@@ -493,6 +494,7 @@ begin
     initialize_sructure(&config, &seed);
 
     printf("Starting threads.\n");
+    var thread_pinner *thread_pinner_t = thread_pinner_create();
     var tids *pthread_t = new [config.thread_count]pthread_t;
     var ptds *per_thread_data_t = new [config.thread_count]per_thread_data_t;
     for var i = 0; i < config.thread_count; ++i do
@@ -506,6 +508,11 @@ begin
         var ret = pthread_create(&tids[i], nil, thread, &ptds[i]);
         if ret != 0 then
             printf("error: failed to create thread id: %d\n", i);
+            exit(1);
+        fi
+        var pinning_status = pin_thread(thread_pinner, tids[i]);
+        if pinning_status != 0 then
+            printf("error: failed to pin thread id: %d\n", i);
             exit(1);
         fi
     od
