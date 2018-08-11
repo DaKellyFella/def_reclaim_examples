@@ -155,7 +155,7 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   width = 0.30
   ind = range(len(def_norms))
   off_ind = [x +width for x in ind]
-  plt.title("Normalised data-structure performance.")
+  plt.title('Normalised data-structure performance.')
   plt.grid(b=True, which='major', color='black', linestyle='-')
   ax = plt.gca()
   # bar1 = ax.bar(range(len(def_norms)), def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
@@ -179,13 +179,13 @@ def parse_file(key, data):
   data_file = data
 
   keys = {}
-  with open(key_file, "r") as open_file:
+  with open(key_file, 'r') as open_file:
     for key_line in open_file:
       for idx, key in enumerate(key_line.split(",")):
         keys[key.strip()] = idx
 
   raw_results = []
-  with open(data_file, "r") as open_file:
+  with open(data_file, 'r') as open_file:
     for result in open_file:
       raw_results.append([x.strip() for x in result.split(",")])
   
@@ -200,9 +200,9 @@ def parse_file(key, data):
     config = structure_category
     filename = structure_category.replace(" ", "")
     if 'update_rate' in keys:
-      config += " w update rate: " + result[keys['update_rate']] + '%'
+      config += ' w update rate: ' + result[keys['update_rate']] + '%'
       if result[keys['update_rate']] == '10':
-        filename += "Light"
+        filename += 'Light'
 
     if not(config in perf_results):
       perf_results[config] = (structure_category, {}, filename)
@@ -220,7 +220,8 @@ def parse_file(key, data):
 
 
 def main():
-    
+  if not os.path.exists('figures;):
+    os.makedirs('figures')
   set_results = parse_file('set_keys.csv', 'set_data.csv')
   for config in set_results:
     create_line_plots(config, set_results)

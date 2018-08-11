@@ -64,11 +64,11 @@ try_again:
   }
 }
 
-c_mm_ht_t * c_mm_ht_create(uint64_t size) {
+c_mm_ht_t * c_mm_ht_create(uint64_t size, uint64_t list_length) {
   c_mm_ht_t *ret = forkscan_malloc(sizeof(c_mm_ht_t));
-  ret->size = size;
-  ret->table = forkscan_malloc(size * sizeof(node_ptr));
-  for(uint64_t i = 0; i < size; i++) {
+  ret->size = size / list_length;
+  ret->table = forkscan_malloc(ret->size  * sizeof(node_ptr));
+  for(uint64_t i = 0; i < ret->size; i++) {
     ret->table[i] = NULL;
   }
   return ret;

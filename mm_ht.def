@@ -62,10 +62,10 @@ retry:
 end
 
 export
-def mm_ht_create(size i64) -> *mm_ht_t
+def mm_ht_create(size i64, list_length i64) -> *mm_ht_t
 begin
   var ret = new mm_ht_t;
-  ret.size = size;
+  ret.size = size / list_length;
   ret.table = new[ret.size]node_ptr;
   for var i i32 = 0; i < size; i++ do
     ret.table[i] = nil;

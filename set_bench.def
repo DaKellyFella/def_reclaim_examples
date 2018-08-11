@@ -660,7 +660,7 @@ begin
         od
         config.structure = set;
     xcase MM_HT:
-        var set = mm_ht_create(config.upper_bound);
+        var set = mm_ht_create(config.upper_bound, 32);
         for var i = 0; i < config.init_size; ++i do
             var val = fast_rand(seed) % config.upper_bound;
             if !mm_ht_add(set, val) then
@@ -669,7 +669,7 @@ begin
         od
         config.structure = set;
     xcase C_MM_HT:
-        var set = c_mm_ht_create(config.upper_bound);
+        var set = c_mm_ht_create(config.upper_bound, 32);
         for var i = 0; i < config.init_size; ++i do
             var val = fast_rand(seed) % config.upper_bound;
             if 0 == c_mm_ht_add(set, val) then
