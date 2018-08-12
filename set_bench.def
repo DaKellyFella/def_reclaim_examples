@@ -5,6 +5,7 @@ import "stdio.h";
 import "time.h";
 import "stdlib.h";
 import "thread_pinner.h";
+import "unistd.h";
 
 // Set data structures:
 import "fhsl_lf.defi";
@@ -69,6 +70,14 @@ typedef per_thread_data_t =
         stats          stats_t
     };
 
+typedef initialisation_thread_data_t =
+    {
+        config              *config_t,
+        current_action      volatile *i64,
+        actions_completed   volatile *i64
+    };
+
+
 /** Return the time in seconds.
  */
 def hires_timer () -> f64
@@ -82,6 +91,17 @@ begin
     var sec = cast(type f64, ts.tv_sec);
     var nsec = cast(type f64, ts.tv_nsec);
     return sec + nsec / (1000.0 * 1000.0 * 1000.0);
+end
+
+def fetch_and_add(counter *volatile i64) -> i64
+begin
+    var val = counter[0];
+    while true do
+        if __builtin_cas(counter, val, val + 1) then
+            return val;
+        fi
+        val = counter[0];
+    od
 end
 
 def fast_rand (seed *u64) -> u64
@@ -620,85 +640,101 @@ begin
     return nil;
 end
 
+def thread_initialise(arg *void) -> *void 
+begin
+    var thread_data *initialisation_thread_data_t = cast(type *initialisation_thread_data_t, arg);
+    var config *config_t = thread_data.config;
+    var set = config.structure;
+    var seed u64 = cast(type u64, time(nil));
+    var current_action *volatile i64 = thread_data.current_action;
+    var actions_completed *volatile i64 = thread_data.actions_completed;
+    var bound = config.init_size;
+    while true do
+        // We've gone over the number of bound
+        var new_action = fetch_and_add(current_action);
+        if new_action >= bound then
+            return nil;
+        fi
+
+        while true do
+            var val = fast_rand(&seed) % config.upper_bound;
+            var res = false;
+            switch config.benchmark with
+            xcase FHSL_LF:
+                res = fhsl_lf_add(&seed, config.structure, val);
+            xcase C_FHSL_LF:
+                res = c_fhsl_lf_add(&seed, config.structure, val) == 0;
+            xcase BT_LF:
+                res = bt_lf_add(config.structure, val);
+            xcase C_BT_LF:
+                res = c_bt_lf_add(config.structure, val) == 0;
+            xcase MM_HT:
+                res = mm_ht_add(config.structure, val);
+            xcase C_MM_HT:
+                res = c_mm_ht_add(config.structure, val) == 0;
+            xcase SO_HT:
+                res = so_ht_add(config.structure, val);
+            xcase C_SO_HT:
+                res = c_so_ht_add(config.structure, val) == 0;
+            xcase _:
+                printf("error: unable to initialize unknown set.\n");
+                exit(1);
+            esac
+            if res then
+                break;
+            fi
+        od
+        fetch_and_add(actions_completed);
+    od
+end
+
+
 def initialize_sructure (config *config_t, seed *u64) -> void
 begin
     switch config.benchmark with
     xcase FHSL_LF:
-        var set = fhsl_lf_create();
-        for var i = 0; i < config.init_size; ++i do
-            var val = fast_rand(seed) % config.upper_bound;
-            if false == fhsl_lf_add(seed, set, val) then
-                --i;
-            fi
-        od
-        config.structure = set;
+        config.structure = fhsl_lf_create();
     xcase C_FHSL_LF:
-        var set = c_fhsl_lf_create();
-        for var i = 0; i < config.init_size; ++i do
-            var val = fast_rand(seed) % config.upper_bound;
-            if 0 == c_fhsl_lf_add(seed, set, val) then
-                --i;
-            fi
-        od
-        config.structure = cast(type *void, set);
+        config.structure = c_fhsl_lf_create();
     xcase BT_LF:
-        var set = bt_lf_create();
-        for var i = 0; i < config.init_size; ++i do
-            var val = fast_rand(seed) % config.upper_bound;
-            if false == bt_lf_add(set, val) then
-                --i;
-            fi 
-        od
-        config.structure = set;
+        config.structure = bt_lf_create();
     xcase C_BT_LF:
-        var set = c_bt_lf_create();
-        for var i = 0; i < config.init_size; ++i do
-            var val = fast_rand(seed) % config.upper_bound;
-            if 0 == c_bt_lf_add(set, val) then
-                --i;
-            fi
-        od
-        config.structure = set;
+        config.structure = c_bt_lf_create();
     xcase MM_HT:
-        var set = mm_ht_create(config.upper_bound, 32);
-        for var i = 0; i < config.init_size; ++i do
-            var val = fast_rand(seed) % config.upper_bound;
-            if !mm_ht_add(set, val) then
-                --i;
-            fi
-        od
-        config.structure = set;
+        config.structure = mm_ht_create(config.upper_bound, 32);
     xcase C_MM_HT:
-        var set = c_mm_ht_create(config.upper_bound, 32);
-        for var i = 0; i < config.init_size; ++i do
-            var val = fast_rand(seed) % config.upper_bound;
-            if 0 == c_mm_ht_add(set, val) then
-                --i;
-            fi
-        od
-        config.structure = set;
+        config.structure = c_mm_ht_create(config.upper_bound, 32);
     xcase SO_HT:
-        var set = so_ht_create(config.upper_bound, 5);
-        for var i = 0; i < config.init_size; ++i do
-            var val = fast_rand(seed) % config.upper_bound;
-            if !so_ht_add(set, val) then
-                --i;
-            fi
-        od
-        config.structure = set;
+        config.structure = so_ht_create(config.upper_bound, 5);
     xcase C_SO_HT:
-        var set = c_so_ht_create(config.upper_bound, 5);
-        for var i = 0; i < config.init_size; ++i do
-            var val = fast_rand(seed) % config.upper_bound;
-            if 0 == c_so_ht_add(set, val) then
-                --i;
-            fi
-        od
-        config.structure = set;
+        config.structure = c_so_ht_create(config.upper_bound, 5);
     xcase _:
         printf("error: unable to initialize unknown set.\n");
         exit(1);
     esac
+    
+    var current_action volatile *i64 = new i64;
+    var actions_completed volatile *i64 = new i64;
+    var thread_data initialisation_thread_data_t = {config, current_action, actions_completed};
+    var max_threads = get_num_cores();
+    printf("MAX THREADS %d\n", max_threads);
+    var tids *pthread_t = new [max_threads]pthread_t;
+    for var i = 0; i < max_threads; ++i do
+        var ret = pthread_create(&tids[i], nil, thread_initialise, &thread_data);
+        if ret != 0 then
+            printf("error: failed to create thread id: %d\n", i);
+            exit(1);
+        fi
+    od
+    for var i = 0; i < max_threads; ++i do
+        var ret = pthread_join(tids[i], nil);
+        if ret != 0 then
+            printf("error: failed to join thread id: %d\n", i);
+            exit(1);
+        fi
+        printf("[joined thread %d]\n", i);
+    od
+    printf("Current actions: %d and Actions Completed: %d\n", current_action[0], actions_completed[0]);
 end
 
 export

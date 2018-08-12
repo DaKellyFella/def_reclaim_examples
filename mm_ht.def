@@ -67,7 +67,7 @@ begin
   var ret = new mm_ht_t;
   ret.size = size / list_length;
   ret.table = new[ret.size]node_ptr;
-  for var i i32 = 0; i < size; i++ do
+  for var i i32 = 0; i < ret.size; i++ do
     ret.table[i] = nil;
   od
   return ret;
@@ -87,13 +87,16 @@ def mm_ht_add(set *mm_ht_t, key i64) -> bool
 begin
   var key_hash = hash(key);
   var bucket i64 = key_hash % set.size;
-  var new_node = new node;
-  new_node.key = key;
+  var new_node node_ptr= nil;
   while true do
     var view list_view_t = {nil, nil, nil};
     if find(&view, &set.table[bucket], key) then
       delete new_node;
       return false;
+    fi
+    if new_node == nil then
+      new_node = new node;
+      new_node.key = key;
     fi
     new_node.next = unmark(view.current);
     if __builtin_cas(view.previous, view.current, new_node) then

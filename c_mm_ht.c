@@ -84,13 +84,16 @@ int c_mm_ht_contains(c_mm_ht_t * set, key_t key) {
 int c_mm_ht_add(c_mm_ht_t * set, key_t key) {
   uint64_t key_hash = hash(key);
   uint64_t bucket = key_hash % set->size;
-  node_ptr new_node = forkscan_malloc(sizeof(node_t));
-  new_node->key = key;
+  node_ptr new_node = NULL;
   while(true) {
     list_view_t view;
     if(find(&view, &set->table[bucket], key)) {
       forkscan_free((void*)new_node);
       return false;
+    }
+    if(new_node == NULL) {
+      new_node = forkscan_malloc(sizeof(node_t));
+      new_node->key = key;
     }
     new_node->next = unmark(view.current);
     if(__sync_bool_compare_and_swap(view.previous, view.current, new_node)) {
