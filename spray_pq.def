@@ -113,6 +113,7 @@ begin
     od
     // Insert dummy nodes
     spray_pqueue.padding_head = &spray_pqueue.head;
+    printf("PADDING AMOUNT %d\n", config.padding_amount);
     for var i = 1; i < config.padding_amount; ++i do
         var padding_node = new node_t;
         padding_node.state = PADDING;
@@ -133,14 +134,22 @@ begin
     var preds [20]*node_t;
     var succs [20]*node_t;
     var toplevel = random_level(seed, 20);
+    var node *node_t = nil;
+            //node.priority = priority;
+            //node.toplevel = toplevel;
+            //node.state = ACTIVE;
+            
     while true do
         if find(set, priority, preds, succs) then
+            delete node;
             return false;
         else
-            var node = new node_t;
-            node.priority = priority;
-            node.toplevel = toplevel;
-            node.state = ACTIVE;
+            if node == nil then
+                node = new node_t;
+                node.priority = priority;
+                node.toplevel = toplevel;
+                node.state = ACTIVE;
+            fi
             for var i = 0; i <= toplevel; ++i do
                 node.next[i] = unmark(succs[i]);
             od
