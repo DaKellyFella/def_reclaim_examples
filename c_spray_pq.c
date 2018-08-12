@@ -291,37 +291,36 @@ int c_spray_pq_remove_leaky(c_spray_pq_t *set, int64_t key) {
  * using the underlying spray method for node selection.
  */
 int c_spray_pq_leaky_pop_min(uint64_t *seed, c_spray_pq_t *set) {
-  while(true) {
-    bool cleaner = (fast_rand(seed) % (set->config.thread_count + 1)) == 0;
-    if(cleaner) {
-      // FIXME: Figure out the best constant/value here.
-      size_t dist = 0, limit = set->config.padding_amount * set->config.padding_amount;
-      limit = limit < 30 ? 30 : limit;
-      for(node_ptr curr =
-        node_unmark(set->head.next[0]);
-        curr != &set->tail;
-        curr = node_unmark(curr->next[0]), dist++){
-        if(curr->state == DELETED) {
-          c_spray_pq_remove_leaky(set, curr->key);
-        }
-        if(dist == limit) {
-          break;
-        }
-      }
-      //c_spray_pq_print(set);
-    }
-    bool empty = set->head.next[0] == &set->tail;
-    if(empty) {
-      return false;
-    }
+  bool cleaner = (fast_rand(seed) % (set->config.thread_count + 1)) == 0;
+  // if(cleaner) {
+  //   // FIXME: Figure out the best constant/value here.
+  //   size_t dist = 0, limit = set->config.padding_amount * set->config.padding_amount;
+  //   limit = limit < 30 ? 30 : limit;
+  //   for(node_ptr curr =
+  //     node_unmark(set->head.next[0]);
+  //     curr != &set->tail;
+  //     curr = node_unmark(curr->next[0]), dist++){
+  //     if(curr->state == DELETED) {
+  //       c_spray_pq_remove_leaky(set, curr->key);
+  //     }
+  //     if(dist == limit) {
+  //       break;
+  //     }
+  //   }
+  //   //c_spray_pq_print(set);
+  // }
+  bool empty = set->head.next[0] == &set->tail;
+  if(empty) {
+    return false;
+  }
 
-    node_ptr node = spray(seed, set);
+  node_ptr node = spray(seed, set);
+  for(; node != &set->tail; node = node_unmark(node->next[0])) {
     if(node->state == PADDING || node->state == DELETED){
       continue;
     }
-
     if(__sync_bool_compare_and_swap(&node->state, ACTIVE, DELETED)) {
-      return true;
+      return c_spray_pq_remove_leaky(set, node->key);
     }
   }
   return false;

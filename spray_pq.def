@@ -41,7 +41,7 @@ begin
   var spray_config spray_pq_config_t = {
     cast(type i64, threads), cast(type i64, log2(threads) + 1),
     cast(type i64, log2(threads) + 1), 1I64, 
-    threads * cast(type i64, log2(log_arg))
+    cast(type i64, log2(log_arg))
   };
   return spray_config;
 end
@@ -271,8 +271,7 @@ end
 export
 def spray_pq_pop_min (seed *u64, set *spray_pq_t) -> bool
 begin
-  while true do
-    var cleaner = (fast_rand(seed) % (set.config.thread_count + 1)) == 0;
+    /*var cleaner = (fast_rand(seed) % (set.config.thread_count + 1)) == 0;
     if cleaner then
         var dist = 0;
         var limit = set.config.padding_amount * set.config.padding_amount;
@@ -287,14 +286,15 @@ begin
                 break;
             fi
         od
-    fi
+    fi*/
 
-    var empty bool = set.head.next[0] == &set.tail;
-    if empty then
+  var empty bool = set.head.next[0] == &set.tail;
+  if empty then
       return false;
-    fi
+  fi
 
-    var node = spray(seed, set);
+  
+  for var node = spray(seed, set); node != &set.tail; node = unmark(node.next[0]) do
     
     // Spray failed, try again
     if node.state == PADDING || node.state == DELETED then
@@ -304,52 +304,31 @@ begin
     var res = __builtin_cas(&node.state, ACTIVE, DELETED);
     // We didn't delete a node from the list.
     if res then
-      return true;
+      return spray_pq_remove(set, node.priority);
     fi
   od
+  return false;
 end
 
 /** Remove a node, lock-free, from the skiplist.  Leak the memory.
  */
 export
 def spray_pq_leaky_pop_min (seed *u64, set *spray_pq_t) -> bool
-begin
-  while true do
-    var cleaner = (fast_rand(seed) % (set.config.thread_count + 1)) == 0;
-    if cleaner then
-        var dist = 0;
-        var limit = set.config.padding_amount * set.config.padding_amount;
-        if limit < 30 then
-            limit = 30;
-        fi
-        for var curr = unmark(set.head.next[0]); curr != &set.tail; curr = unmark(curr.next[0]) do
-            if curr.state == DELETED then
-                spray_pq_leaky_remove(set, curr.priority);
-            fi
-            if dist++ == limit then
-                break;
-            fi
-        od
-    fi
-      
-    var empty bool = set.head.next[0] == &set.tail;
-    if empty then
-        return false;
-    fi
-    
-    var node = spray(seed, set);
+begin  
+  for var node = spray(seed, set); node != &set.tail; node = unmark(node.next[0]) do
     
     // Spray failed, try again
     if node.state == PADDING || node.state == DELETED then
-        continue;
+      continue;
     fi
 
     var res = __builtin_cas(&node.state, ACTIVE, DELETED);
     // We didn't delete a node from the list.
     if res then
-        return true;
+      return spray_pq_leaky_remove(set, node.priority);
     fi
   od
+  return false;
 end
 
 def fast_rand (seed *u64) -> u64
