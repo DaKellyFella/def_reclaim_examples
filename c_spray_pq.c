@@ -134,7 +134,7 @@ static node_ptr spray(uint64_t * seed, c_spray_pq_t * set) {
   node_ptr cur_node = set->padding_head;
   int64_t D = set->config.descend_amount;
   for(int64_t H = set->config.start_height; H >= 0; H = H - D) {
-    int64_t jump = (fast_rand(seed) % set->config.max_jump) + 1;
+    int64_t jump = fast_rand(seed) % (set->config.max_jump + 1);
     while(jump-- > 0) {
       node_ptr next = node_unmark(cur_node->next[H]);
       if(next == NULL) {

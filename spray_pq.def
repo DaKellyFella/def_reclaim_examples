@@ -265,9 +265,17 @@ begin
   while true do
     var cleaner = (fast_rand(seed) % (set.config.thread_count + 1)) == 0;
     if cleaner then
+        var dist = 0;
+        var limit = set.config.padding_amount * set.config.padding_amount;
+        if limit < 30 then
+            limit = 30;
+        fi
         for var curr = unmark(set.head.next[0]); curr != &set.tail; curr = unmark(curr.next[0]) do
             if curr.state == DELETED then
                 spray_pq_remove(set, curr.priority);
+            fi
+            if dist++ == limit then
+                break;
             fi
         od
     fi
@@ -300,9 +308,17 @@ begin
   while true do
     var cleaner = (fast_rand(seed) % (set.config.thread_count + 1)) == 0;
     if cleaner then
+        var dist = 0;
+        var limit = set.config.padding_amount * set.config.padding_amount;
+        if limit < 30 then
+            limit = 30;
+        fi
         for var curr = unmark(set.head.next[0]); curr != &set.tail; curr = unmark(curr.next[0]) do
             if curr.state == DELETED then
                 spray_pq_leaky_remove(set, curr.priority);
+            fi
+            if dist++ == limit then
+                break;
             fi
         od
     fi
@@ -354,17 +370,13 @@ begin
   var cur_node *node_t = set.padding_head;
   var D = set.config.descend_amount;
   for var H = set.config.start_height; H >= 0; H = H - D do
-    var jump = (fast_rand(seed) % set.config.max_jump) + 1;
-    while jump > 0 do
+    var jump = fast_rand(seed) % (set.config.max_jump + 1);
+    while jump-- > 0 do
       var next = unmark(cur_node.next[H]);
       if next == nil then
         break;
       fi
-      if next == &set.tail then
-        break;
-      fi
       cur_node = next;
-      jump--;
     od
   od
   return cur_node;

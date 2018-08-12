@@ -663,19 +663,19 @@ begin
             xcase FHSL_LF:
                 res = fhsl_lf_add(&seed, config.structure, val);
             xcase C_FHSL_LF:
-                res = c_fhsl_lf_add(&seed, config.structure, val) == 0;
+                res = c_fhsl_lf_add(&seed, config.structure, val) == 1;
             xcase BT_LF:
                 res = bt_lf_add(config.structure, val);
             xcase C_BT_LF:
-                res = c_bt_lf_add(config.structure, val) == 0;
+                res = c_bt_lf_add(config.structure, val) == 1;
             xcase MM_HT:
                 res = mm_ht_add(config.structure, val);
             xcase C_MM_HT:
-                res = c_mm_ht_add(config.structure, val) == 0;
+                res = c_mm_ht_add(config.structure, val) == 1;
             xcase SO_HT:
                 res = so_ht_add(config.structure, val);
             xcase C_SO_HT:
-                res = c_so_ht_add(config.structure, val) == 0;
+                res = c_so_ht_add(config.structure, val) == 1;
             xcase _:
                 printf("error: unable to initialize unknown set.\n");
                 exit(1);
@@ -701,7 +701,15 @@ begin
     xcase C_BT_LF:
         config.structure = c_bt_lf_create();
     xcase MM_HT:
-        config.structure = mm_ht_create(config.upper_bound, 32);
+        switch config.policy with
+        xcase POLICY_LEAKY:
+            config.structure = mm_ht_create(config.upper_bound, 32, true);
+        xcase POLICY_RETIRE:
+            config.structure = mm_ht_create(config.upper_bound, 32, false);
+        xcase _:
+            printf("error: unsupported mem policy for benchmark.\n");
+            exit(1);
+        esac
     xcase C_MM_HT:
         config.structure = c_mm_ht_create(config.upper_bound, 32);
     xcase SO_HT:
@@ -714,9 +722,14 @@ begin
     esac
     
     var current_action volatile *i64 = new i64;
+    current_action[0] = 0;
     var actions_completed volatile *i64 = new i64;
+    actions_completed[0] = 0;
     var thread_data initialisation_thread_data_t = {config, current_action, actions_completed};
     var max_threads = get_num_cores();
+    if max_threads > 32 then
+        max_threads = 32;
+    fi
     printf("MAX THREADS %d\n", max_threads);
     var tids *pthread_t = new [max_threads]pthread_t;
     for var i = 0; i < max_threads; ++i do

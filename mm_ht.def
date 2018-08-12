@@ -17,6 +17,7 @@ export opaque
 typedef mm_ht_t =
   {
     size  i64,
+    leak bool,
     table *node_ptr
   };
 
@@ -33,7 +34,7 @@ begin
 end
 
 
-def find(view *list_view_t, head volatile *node_ptr, key i64) -> bool
+def find(view *list_view_t, head volatile *node_ptr, key i64, leak bool) -> bool
 begin
   var nonsese = false;
 retry:
@@ -53,7 +54,11 @@ retry:
       view.previous = &unmark(view.current).next;
     else
       // Shortened down since it's leaky memory.
-      if !__builtin_cas(view.previous, view.current, view.next) then
+      if __builtin_cas(view.previous, unmark(view.current), unmark(view.next)) then
+        if !leak then
+          retire view.current;
+        fi
+      else 
         goto retry;
       fi
     fi
@@ -62,10 +67,11 @@ retry:
 end
 
 export
-def mm_ht_create(size i64, list_length i64) -> *mm_ht_t
+def mm_ht_create(size i64, list_length i64, leak bool) -> *mm_ht_t
 begin
   var ret = new mm_ht_t;
   ret.size = size / list_length;
+  ret.leak = leak;
   ret.table = new[ret.size]node_ptr;
   for var i i32 = 0; i < ret.size; i++ do
     ret.table[i] = nil;
@@ -79,7 +85,7 @@ begin
   var key_hash = hash(key);
   var bucket = key_hash % set.size;
   var view list_view_t = {nil, nil, nil};
-  return find(&view, &set.table[bucket], key);
+  return find(&view, &set.table[bucket], key, set.leak);
 end
 
 export
@@ -90,7 +96,7 @@ begin
   var new_node node_ptr= nil;
   while true do
     var view list_view_t = {nil, nil, nil};
-    if find(&view, &set.table[bucket], key) then
+    if find(&view, &set.table[bucket], key, set.leak) then
       delete new_node;
       return false;
     fi
@@ -112,16 +118,16 @@ begin
   var bucket i64 = key_hash % set.size;
   while true do
     var view list_view_t = {nil, nil, nil};
-    if !find(&view, &set.table[bucket], key) then
+    if !find(&view, &set.table[bucket], key, false) then
       return false;
     fi
-    if !__builtin_cas(&view.current.next, view.next, mark(view.next)) then
+    if !__builtin_cas(&view.current.next, unmark(view.next), mark(view.next)) then
       continue;
     fi
-    if !__builtin_cas(view.previous, view.current, unmark(view.next)) then
-      find(&view, &set.table[bucket], key);
+    if !__builtin_cas(view.previous, unmark(view.current), unmark(view.next)) then
+      find(&view, &set.table[bucket], key, false);
     else
-      retire view.current;
+      retire unmark(view.current);
     fi
     return true;
   od
@@ -134,14 +140,14 @@ begin
   var bucket i64 = key_hash % set.size;
   while true do
     var view list_view_t = {nil, nil, nil};
-    if !find(&view, &set.table[bucket], key) then
+    if !find(&view, &set.table[bucket], key, true) then
       return false;
     fi
     if !__builtin_cas(&view.current.next, view.next, mark(view.next)) then
       continue;
     fi
     if !__builtin_cas(view.previous, view.current, unmark(view.next)) then
-      find(&view, &set.table[bucket], key);
+      find(&view, &set.table[bucket], key, true);
     fi
     return true;
   od
