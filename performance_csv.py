@@ -105,9 +105,9 @@ def create_line_plots(config, perf_results):
     min_ops = min(min(y_ticks), min_ops)
     legends_list.append(
       plt.errorbar(x = x_ticks, y = y_ticks, yerr = y_error, linewidth=2,
-        label = lang_config, color = style_info['graph_colour'], marker = style_info['graph_style'], markersize=10))
-  # loc = plticker.MultipleLocator(base=0.5) # this locator puts ticks at regular intervals
-  # plt.gca().yaxis.set_major_locator(loc)
+        label = lang_config, color = style_info['graph_colour'], marker = style_info['graph_style'], markersize=7))
+  loc = plticker.MultipleLocator(base=18) # this locator puts ticks at regular intervals
+  plt.gca().xaxis.set_major_locator(loc)
   plt.legend(loc='best', fancybox=True, shadow=True, handles = legends_list, ncol = 3)
   
   fig.savefig('./figures/' + filename + '.pdf', bbox_inches='tight')
@@ -160,8 +160,9 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   ax = plt.gca()
   # bar1 = ax.bar(range(len(def_norms)), def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
   bar2 = ax.bar(ind, c_norms, width, color=lang_map['C leaky']['graph_colour'])
-  loc = plticker.MultipleLocator(base=20) # this locator puts ticks at regular intervals
-  ax.yaxis.set_major_locator(loc)
+  # loc = plticker.MultipleLocator(base=20) # this locator puts ticks at regular intervals
+  # ax.yaxis.set_major_locator(loc)
+  ax.set_ylim(0,130)
   # ax.set_xlim(-width,len(ind)+width)
   ax.set_xlim(-width * 2,len(ind))
   ax.set_ylabel('Percentage')
