@@ -298,6 +298,7 @@ begin
     ocase { C_FHSL_LF, POLICY_LEAKY }:
     ocase { BT_LF, POLICY_RETIRE }:
     ocase { BT_LF, POLICY_LEAKY }:
+    ocase { C_BT_LF, POLICY_RETIRE }:
     ocase { C_BT_LF, POLICY_LEAKY }:
     ocase { MM_HT, POLICY_RETIRE }:
     ocase { MM_HT, POLICY_LEAKY }:
@@ -509,6 +510,10 @@ begin
                 switch policy with
                 xcase POLICY_LEAKY:
                     if 0 != c_bt_lf_remove_leaky(set, val) then
+                        stats.remove_successes++;
+                    fi
+                xcase POLICY_RETIRE:
+                    if 0 != c_bt_lf_remove_retire(set, val) then
                         stats.remove_successes++;
                     fi
                 xcase _:

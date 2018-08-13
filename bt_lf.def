@@ -3,6 +3,7 @@
 */
 
 import "stddef.h";
+import "stdio.h";
 
 typedef node_t = {
     key i64,
@@ -164,7 +165,7 @@ begin
     if key < ancestor.key then
         successor_address = &ancestor.left;
     else 
-        successor_address = & ancestor.right;
+        successor_address = &ancestor.right;
     fi
     var child_val node_ptr = nil;
     var child_address volatile * node_ptr = nil;
@@ -269,7 +270,8 @@ begin
                 mode = CLEANUP;
                 var done = bt_lf_cleanup(set, &sr, key);
                 if done then
-                    retire(leaf);
+                    retire(node_address(parent));
+                    retire(node_address(leaf));
                     return true;
                 fi
             else
@@ -277,16 +279,21 @@ begin
                 if unpacked_node.address == leaf &&
                     (unpacked_node.flagged || unpacked_node.tagged) then
                     var done = bt_lf_cleanup(set, &sr, key);
+                    if done then
+                        retire(node_address(leaf));
+                    fi
                 fi
             fi
         else
             if sr.leaf != leaf then
-                retire(leaf);
+                //retire(leaf);
+                //retire(node_address(leaf));
                 return true;
             else
                 var done = bt_lf_cleanup(set, &sr, key);
                 if done then
-                    retire(leaf);
+                    //retire(node_address(parent));
+                    retire(node_address(leaf));
                     return true;
                 fi
             fi
