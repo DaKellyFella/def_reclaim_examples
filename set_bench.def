@@ -72,9 +72,9 @@ typedef per_thread_data_t =
 
 typedef initialisation_thread_data_t =
     {
-        config              *config_t,
-        current_action      volatile *i64,
-        actions_completed   volatile *i64
+        config        *config_t,
+        total_threads i64,
+        id            i64
     };
 
 
@@ -385,8 +385,8 @@ end
 
 def thread (arg *void) -> *void
 begin
-    var seed = cast(type u64, time(nil));
     var ptd = cast(type volatile *per_thread_data_t, arg);
+    var seed = cast(type u64, time(nil)) + ptd.id;
     var stats stats_t = { 0, 0, 0, 0, 0, 0 };
     var config *config_t = ptd.config;
     var bench = config.benchmark;
@@ -399,7 +399,6 @@ begin
     od
     var read_action = 100 - config.update_rate;
     var add_action = read_action + (config.update_rate / 2);
-    var pqueue_action bool = (fast_rand(&seed) % 100) < 50;
     while ptd.state[0] == STATE_RUN do
         var action = fast_rand(&seed) % 100;
         var val i64 = fast_rand(&seed) % config.upper_bound;
@@ -628,48 +627,43 @@ def thread_initialise(arg *void) -> *void
 begin
     var thread_data *initialisation_thread_data_t = cast(type *initialisation_thread_data_t, arg);
     var config *config_t = thread_data.config;
-    var set = config.structure;
-    var seed u64 = cast(type u64, time(nil));
-    var current_action *volatile i64 = thread_data.current_action;
-    var actions_completed *volatile i64 = thread_data.actions_completed;
+    var seed u64 = cast(type u64, time(nil)) + thread_data.id;
     var bound = config.init_size;
-    while true do
-        // We've gone over the number of bound
-        var new_action = fetch_and_add(current_action);
-        if new_action >= bound then
-            return nil;
+    var thread_slice = bound / thread_data.total_threads;
+    var extra = bound % thread_data.total_threads;
+    var from = thread_slice * thread_data.id;
+    var to = from + thread_slice;
+    if thread_data.id == (thread_data.total_threads - 1) then to += extra; fi
+    var upper_bound = config.upper_bound;
+    var iterations = 0;
+    while from < to do
+        var val i64 = fast_rand(&seed) % config.upper_bound;
+        var res bool = false;
+        switch config.benchmark with
+        xcase FHSL_LF:
+            res = fhsl_lf_add(&seed, config.structure, val);
+        xcase C_FHSL_LF:
+            res = c_fhsl_lf_add(&seed, config.structure, val) == 1;
+        xcase BT_LF:
+            res = bt_lf_add(config.structure, val);
+        xcase C_BT_LF:
+            res = c_bt_lf_add(config.structure, val) == 1;
+        xcase MM_HT:
+            res = mm_ht_add(config.structure, val);
+        xcase C_MM_HT:
+            res = c_mm_ht_add(config.structure, val) == 1;
+        xcase SO_HT:
+            res = so_ht_add(config.structure, val);
+        xcase C_SO_HT:
+            res = c_so_ht_add(config.structure, val) == 1;
+        xcase _:
+            printf("error: unable to initialize unknown set.\n");
+        esac
+        if res then
+            from++;
         fi
-
-        while true do
-            var val = fast_rand(&seed) % config.upper_bound;
-            var res = false;
-            switch config.benchmark with
-            xcase FHSL_LF:
-                res = fhsl_lf_add(&seed, config.structure, val);
-            xcase C_FHSL_LF:
-                res = c_fhsl_lf_add(&seed, config.structure, val) == 1;
-            xcase BT_LF:
-                res = bt_lf_add(config.structure, val);
-            xcase C_BT_LF:
-                res = c_bt_lf_add(config.structure, val) == 1;
-            xcase MM_HT:
-                res = mm_ht_add(config.structure, val);
-            xcase C_MM_HT:
-                res = c_mm_ht_add(config.structure, val) == 1;
-            xcase SO_HT:
-                res = so_ht_add(config.structure, val);
-            xcase C_SO_HT:
-                res = c_so_ht_add(config.structure, val) == 1;
-            xcase _:
-                printf("error: unable to initialize unknown set.\n");
-                exit(1);
-            esac
-            if res then
-                break;
-            fi
-        od
-        fetch_and_add(actions_completed);
     od
+    return nil;
 end
 
 
@@ -713,19 +707,16 @@ begin
         exit(1);
     esac
     
-    var current_action volatile *i64 = new i64;
-    current_action[0] = 0;
-    var actions_completed volatile *i64 = new i64;
-    actions_completed[0] = 0;
-    var thread_data initialisation_thread_data_t = {config, current_action, actions_completed};
     var max_threads = get_num_cores();
     if max_threads > 32 then
         max_threads = 32;
     fi
-    printf("MAX THREADS %d\n", max_threads);
+    printf("Init threads %ld\n", max_threads);
+    var thread_data *initialisation_thread_data_t = new [max_threads]initialisation_thread_data_t;
     var tids *pthread_t = new [max_threads]pthread_t;
     for var i = 0; i < max_threads; ++i do
-        var ret = pthread_create(&tids[i], nil, thread_initialise, &thread_data);
+        thread_data[i] = {config, max_threads, i};
+        var ret = pthread_create(&tids[i], nil, thread_initialise, &thread_data[i]);
         if ret != 0 then
             printf("error: failed to create thread id: %d\n", i);
             exit(1);
@@ -739,7 +730,8 @@ begin
         fi
         printf("[joined thread %d]\n", i);
     od
-    printf("Current actions: %d and Actions Completed: %d\n", current_action[0], actions_completed[0]);
+    delete thread_data;
+    delete tids;
 end
 
 export
