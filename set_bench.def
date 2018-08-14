@@ -637,8 +637,8 @@ begin
     var upper_bound = config.upper_bound;
     var iterations = 0;
     while from < to do
-        var val i64 = fast_rand(&seed) % config.upper_bound;
-        var res bool = false;
+        var val i64 = fast_rand(&seed) % upper_bound;
+        var res = false;
         switch config.benchmark with
         xcase FHSL_LF:
             res = fhsl_lf_add(&seed, config.structure, val);
@@ -708,9 +708,6 @@ begin
     esac
     
     var max_threads = get_num_cores();
-    if max_threads > 32 then
-        max_threads = 32;
-    fi
     printf("Init threads %ld\n", max_threads);
     var thread_data *init_thread_data_t = new [max_threads]init_thread_data_t;
     var tids *pthread_t = new [max_threads]pthread_t;
@@ -730,6 +727,38 @@ begin
         fi
         printf("[joined thread %d]\n", i);
     od
+    // Paranoia
+    /*printf("Checking...\n");
+    var missing = 0;
+    for var val = 0; val < config.upper_bound; val++ do
+        var res = false;
+        switch config.benchmark with
+        xcase FHSL_LF:
+            res = fhsl_lf_contains(config.structure, val);
+        xcase C_FHSL_LF:
+            res = c_fhsl_lf_contains(config.structure, val) == 1;
+        xcase BT_LF:
+            res = bt_lf_contains(config.structure, val);
+        xcase C_BT_LF:
+            res = c_bt_lf_contains(config.structure, val) == 1;
+        xcase MM_HT:
+            res = mm_ht_contains(config.structure, val);
+        xcase C_MM_HT:
+            res = c_mm_ht_contains(config.structure, val) == 1;
+        xcase SO_HT:
+            res = so_ht_contains(config.structure, val);
+        xcase C_SO_HT:
+            res = c_so_ht_contains(config.structure, val) == 1;
+        xcase _:
+            printf("error: unable to initialize unknown set.\n");
+        esac
+        if !res then
+            missing++;
+        fi
+    od
+    if missing != (config.upper_bound - config.init_size) then
+        printf("Set isn't thread safe\n");
+    fi*/
     delete thread_data;
     delete tids;
 end

@@ -80,20 +80,23 @@ begin
     var preds [20]node_ptr;
     var succs [20]node_ptr;
     var toplevel = random_level(seed, 20);
+    var node node_ptr = nil;
     while true do
-        if true == find(set, x, preds, succs) then
+        if find(set, x, preds, succs) then
+            delete node;
             return false;
         fi
-        var node = new node;
-        node.val = x;
-        node.toplevel = toplevel;
+        if node == nil then
+            node = new node;
+            node.val = x;
+            node.toplevel = toplevel;
+        fi
         for var i = 0; i <= toplevel; ++i do
             node.next[i] = unmark(succs[i]);
         od
         var pred = preds[0];
         var succ = succs[0];
         if !__builtin_cas(&pred.next[0], unmark(succ), node) then
-            delete node;
             continue;
         fi
         for var i = 1; i <= toplevel; ++i do
