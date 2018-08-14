@@ -57,15 +57,15 @@ structure_map = {
 lang_map = {
   'DEF leaky' : {
     'graph_style' : '*', 
-    'graph_colour': 'green'
+    'graph_colour': 'blue'
   },
   'C leaky' : {
     'graph_style' : 's', 
-    'graph_colour': 'blue'
+    'graph_colour': 'crimson'
   },
   'DEF retire' : {
     'graph_style' : '^', 
-    'graph_colour': 'crimson'
+    'graph_colour': 'green'
   },
 }
 
@@ -80,6 +80,8 @@ def collate_threads(data):
 
 def create_line_plots(config, perf_results):
   fig = plt.figure()
+  # plt.rcParams['axes.facecolor'] = (230.0 / 255.0, 1, 1)
+
   (structure_name, lang_results, filename) = perf_results[config]
   plt.title(config)
   plt.ylabel(r'Total Ops / $\mu$s')
@@ -89,12 +91,15 @@ def create_line_plots(config, perf_results):
   plt.grid(b=True, which='major', color='black', linestyle='-')
   legends_list = []
   max_ops, min_ops = 0, 0
-  for lang_config in lang_results:
+  for lang_config in sorted(lang_results.keys()):
     (policy, raw_name, data) = lang_results[lang_config]
     thread_ops = collate_threads(data)
     y_ticks = [0]
     y_error = [0]
     x_ticks = [0]
+    # if lang_config == 'DEF leaky':
+    #   continue
+
     for threads in range(1, max(thread_ops) + 1):
       if threads in thread_ops:
         y_ticks.append(mean(thread_ops[threads]))
@@ -108,8 +113,9 @@ def create_line_plots(config, perf_results):
         label = lang_config, color = style_info['graph_colour'], marker = style_info['graph_style'], markersize=7))
   loc = plticker.MultipleLocator(base=18) # this locator puts ticks at regular intervals
   plt.gca().xaxis.set_major_locator(loc)
+  # plt.gca().set_facecolor((0, 0, 0.25))
   plt.legend(loc='best', fancybox=True, shadow=True, handles = legends_list, ncol = 3)
-  
+
   fig.savefig('./figures/' + filename + '.pdf', bbox_inches='tight')
 
 def create_calibrating_bar_plots(set_results, pqueue_results):
@@ -129,7 +135,7 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   
   for config in pqueue_results:
     (structure_name, lang_results, _) = pqueue_results[config]
-    for lang_config in lang_results:
+    for lang_config in sorted(lang_results.keys()):
       (policy, raw_name, data) = lang_results[lang_config]
       thread_ops = collate_threads(data)
       lang = structure_map[raw_name]['lang']
@@ -149,8 +155,8 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   def_norms = []
   c_norms = []
   for (def_res, c_res) in zip(def_numbers, c_numbers):
-    def_norms.append(100.0)
-    c_norms.append((c_res / def_res) * 100.0)
+    def_norms.append((def_res / c_res) * 100.0)
+    c_norms.append(100.0)
   fig = plt.figure()
   width = 0.30
   ind = range(len(def_norms))
@@ -159,21 +165,21 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   plt.grid(b=True, which='major', color='black', linestyle='-')
   ax = plt.gca()
   # bar1 = ax.bar(range(len(def_norms)), def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
-  bar2 = ax.bar(ind, c_norms, width, color=lang_map['C leaky']['graph_colour'])
+  bar2 = ax.bar(ind, def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
   # loc = plticker.MultipleLocator(base=20) # this locator puts ticks at regular intervals
   # ax.yaxis.set_major_locator(loc)
   ax.set_ylim(0,130)
   # ax.set_xlim(-width,len(ind)+width)
   ax.set_xlim(-width * 2,len(ind))
   ax.set_ylabel('Percentage')
-  ax.set_title('C relative to DEF (both leaky)')
+  ax.set_title('DEF relative to C (both leaky)')
   ax.set_xticks([x + (width / 2) for x in ind])
   xtickNames = ax.set_xticklabels(structures)
   plt.setp(xtickNames, rotation=45, fontsize=10)
 
   ## add a legend
-  ax.legend( bar2, 'C' )
-  plt.savefig('./figures/relativeperf.pdf', bbox_inches='tight')
+  ax.legend( [bar2], ['DEF'] )
+  plt.savefig('./figures/RelativePerf.pdf', bbox_inches='tight')
 
 def parse_file(key, data):
   key_file = key
@@ -204,6 +210,8 @@ def parse_file(key, data):
       config += ' w update rate: ' + result[keys['update_rate']] + '%'
       if result[keys['update_rate']] == '10':
         filename += 'Light'
+      elif result[keys['update_rate']] == '20':
+        filename += 'Medium'
 
     if not(config in perf_results):
       perf_results[config] = (structure_category, {}, filename)
@@ -224,6 +232,9 @@ def main():
   if not os.path.exists('figures'):
     os.makedirs('figures')
   set_results = parse_file('set_keys.csv', 'set_data.csv')
+  plt.rcParams['axes.facecolor'] = (1, 1, 230.0 / 255.0)
+  # plt.rcParams['savefig.facecolor'] = (178.0 / 255.0, 192.0 / 255.0, 181.0 / 255.0) ash grey
+  plt.rcParams['savefig.facecolor'] = (227.0 / 255.0, 242.0 / 255.0, 231.0 / 255.0)
   for config in set_results:
     create_line_plots(config, set_results)
   
