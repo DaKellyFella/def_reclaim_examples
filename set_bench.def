@@ -477,19 +477,9 @@ begin
                 fi
             else
                 stats.remove_attempts++;
-                switch policy with
-                xcase POLICY_RETIRE:
-                    if bt_lf_remove_retire(set, val) then
-                        stats.remove_successes++;
-                    fi
-                xcase POLICY_LEAKY:
-                    if bt_lf_remove_leaky(set, val) then
-                        stats.remove_successes++;
-                    fi
-                xcase _:
-                    printf("error: unsupported mem policy for benchmark.\n");
-                    exit(1);
-                esac
+                if bt_lf_remove(set, val) then
+                    stats.remove_successes++;
+                fi
             fi
 /***************************************************************************/
 /*                      lock-free binary tree written in C                 */
@@ -507,19 +497,9 @@ begin
                 fi
             else
                 stats.remove_attempts++;
-                switch policy with
-                xcase POLICY_LEAKY:
-                    if 0 != c_bt_lf_remove_leaky(set, val) then
-                        stats.remove_successes++;
-                    fi
-                xcase POLICY_RETIRE:
-                    if 0 != c_bt_lf_remove_retire(set, val) then
-                        stats.remove_successes++;
-                    fi
-                xcase _:
-                    printf("error: unsupported mem policy for benchmark.\n");
-                    exit(1);
-                esac
+                if 0 != c_bt_lf_remove(set, val) then
+                    stats.remove_successes++;
+                fi
             fi
 /***************************************************************************/
 /*           Maged Michael lock-free hash table written in DEF             */
@@ -702,9 +682,17 @@ begin
     xcase C_FHSL_LF:
         config.structure = c_fhsl_lf_create();
     xcase BT_LF:
-        config.structure = bt_lf_create();
+        switch config.policy with
+        xcase POLICY_LEAKY:
+            config.structure = bt_lf_create(true);
+        xcase POLICY_RETIRE:
+            config.structure = bt_lf_create(false);
+        xcase _:
+            printf("error: unsupported mem policy for benchmark.\n");
+            exit(1);
+        esac
     xcase C_BT_LF:
-        config.structure = c_bt_lf_create();
+        config.structure = c_bt_lf_create(false);
     xcase MM_HT:
         switch config.policy with
         xcase POLICY_LEAKY:

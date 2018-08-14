@@ -16,6 +16,7 @@ typedef node_ptr =  volatile * volatile node_t;
 
 export opaque
 typedef bt_lf_t = {
+    leaky bool,
     R node_ptr,
     S node_ptr
 };
@@ -98,9 +99,10 @@ begin
 end
 
 export
-def bt_lf_create() -> *bt_lf_t
+def bt_lf_create(leaky bool) -> *bt_lf_t
 begin
     var bt_lf = new bt_lf_t;
+    bt_lf.leaky = leaky;
     bt_lf.R = node_create(0x7FFFFFFFFFFFFFFFI64);
     bt_lf.S = node_create(0x7FFFFFFFFFFFFFFEI64);
     bt_lf.R.left = bt_lf.S;
@@ -188,12 +190,17 @@ begin
         sibling_val = child_val;
         sibling_address = child_address;
     fi
-    __builtin_cas(sibling_address, sibling_val,
+
+    __builtin_cas(sibling_address, node_address(sibling_val),
         node_tag(sibling_val, true));
     var unpacked_sibbling node_unpacked_t = 
         node_unpack(sibling_address[0]);
-    return __builtin_cas(successor_address, node_address(successor),
+    var res = __builtin_cas(successor_address, node_address(successor),
         node_flag(unpacked_sibbling.address, unpacked_sibbling.flagged));
+    if !set.leaky && res then
+        retire successor;
+    fi
+    return res;
 end
 
 export
@@ -245,7 +252,7 @@ begin
 end
 
 export
-def bt_lf_remove_retire(set *bt_lf_t, key i64) -> bool
+def bt_lf_remove(set *bt_lf_t, key i64) -> bool
 begin
     var mode = INJECTION;
     var leaf node_ptr = nil;
@@ -270,63 +277,9 @@ begin
                 mode = CLEANUP;
                 var done = bt_lf_cleanup(set, &sr, key);
                 if done then
-                    retire(node_address(parent));
-                    retire(node_address(leaf));
-                    return true;
-                fi
-            else
-                var unpacked_node node_unpacked_t = node_unpack(child_address[0]);
-                if unpacked_node.address == leaf &&
-                    (unpacked_node.flagged || unpacked_node.tagged) then
-                    var done = bt_lf_cleanup(set, &sr, key);
-                    if done then
-                        retire(node_address(leaf));
+                    if !set.leaky then
+                        retire(leaf);
                     fi
-                fi
-            fi
-        else
-            if sr.leaf != leaf then
-                //retire(leaf);
-                //retire(node_address(leaf));
-                return true;
-            else
-                var done = bt_lf_cleanup(set, &sr, key);
-                if done then
-                    //retire(node_address(parent));
-                    retire(node_address(leaf));
-                    return true;
-                fi
-            fi
-        fi
-    od
-end
-
-export
-def bt_lf_remove_leaky(set *bt_lf_t, key i64) -> bool
-begin
-    var mode = INJECTION;
-    var leaf node_ptr = nil;
-    while true do
-        var sr seek_record_t;
-        bt_lf_seek(set, &sr, key);
-        var parent = sr.parent;
-        var child_address volatile * node_ptr = nil;
-        if key < parent.key then
-            child_address = &parent.left;
-        else
-            child_address = &parent.right;
-        fi
-        if mode == INJECTION then
-            leaf = sr.leaf;
-            if leaf.key != key then
-                return false;
-            fi
-            var result = __builtin_cas(child_address,
-                node_address(leaf), node_flag(leaf, true));
-            if result then
-                mode = CLEANUP;
-                var done = bt_lf_cleanup(set, &sr, key);
-                if done then
                     return true;
                 fi
             else
@@ -338,10 +291,16 @@ begin
             fi
         else
             if sr.leaf != leaf then
+                if !set.leaky then
+                    retire(leaf);
+                fi
                 return true;
             else
                 var done = bt_lf_cleanup(set, &sr, key);
                 if done then
+                    if !set.leaky then
+                        retire(leaf);
+                    fi
                     return true;
                 fi
             fi
