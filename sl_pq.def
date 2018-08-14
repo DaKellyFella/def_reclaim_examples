@@ -5,6 +5,7 @@
  */
 
 import "stdio.h";
+import "assert.h";
 
 typedef state_t = enum
     | ACTIVE
@@ -72,34 +73,37 @@ def sl_pq_add (seed *u64, set *sl_pq_t, x i64) -> bool
 begin
     var preds [20]node_ptr;
     var succs [20]node_ptr;
-    var node node_ptr = nil;
     var toplevel = random_level(seed, 20);
+    var node node_ptr = nil;
     while true do
-        if find(set, x, preds, succs) then
+        if true == find(set, x, preds, succs) then
             delete node;
             return false;
-        else
-            if node == nil then node = node_create(x, toplevel); fi
-            for var i = 0; i <= toplevel; ++i do
-                node.next[i] = unmark(succs[i]);
-            od
-            var pred = preds[0];
-            var succ = succs[0];
-            if !__builtin_cas(&pred.next[0], unmark(succ), node) then
-                continue;
-            fi
-            for var i = 1; i <= toplevel; ++i do
-                while true do
-                    pred = preds[i];
-                    succ = succs[i];
-                    if __builtin_cas(&pred.next[i], unmark(succ), node) then
-                        break;
-                    fi
-                    find(set, x, preds, succs);
-                od
-            od
-            return true;
         fi
+        var node = new node;
+        node.val = x;
+        node.toplevel = toplevel;
+        if node == nil then node = node_create(x, toplevel); fi
+        for var i = 0; i <= toplevel; ++i do
+            node.next[i] = unmark(succs[i]);
+        od
+        var pred = preds[0];
+        var succ = succs[0];
+        if !__builtin_cas(&pred.next[0], unmark(succ), node) then
+            delete node;
+            continue;
+        fi
+        for var i = 1; i <= toplevel; ++i do
+            while true do
+                pred = preds[i];
+                succ = succs[i];
+                if __builtin_cas(&pred.next[i], unmark(succ), node) then
+                    break;
+                fi
+                find(set, x, preds, succs);
+            od
+        od
+        return true;
     od
 end
 
@@ -112,7 +116,7 @@ begin
     var succs [20]node_ptr;
     var succ node_ptr;
     while true do
-        if !find(set, x, preds, succs) then
+        if false == find(set, x, preds, succs) then
             return false;
         else
             var node_to_remove = succs[0];
@@ -139,7 +143,7 @@ begin
                 marked = is_marked(succ);
                 if i_marked_it then
                     // FIXME: succs[0]?  Should retire node_to_remove?
-                    retire node_to_remove;
+                    retire unmark(succs[0]);
                     find(set, x, preds, succs);
                     return true;
                 elif marked then
@@ -163,6 +167,9 @@ begin
             return false;
         fi
         var node_to_remove = succs[0];
+        if node_to_remove.state != DELETED then
+            printf("Fuck\n");
+        fi
         var marked bool;
         for var level = node_to_remove.toplevel;
             level >= 1;
@@ -228,7 +235,8 @@ begin
         var res = __builtin_cas(&curr.state, ACTIVE, DELETED);
         if res then
             // Physically delete the node now.
-            return sl_pq_remove(set, curr.val);
+            sl_pq_remove(set, curr.val);
+            return true;
         fi
     od
     return false;

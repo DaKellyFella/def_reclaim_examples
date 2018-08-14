@@ -11,8 +11,8 @@
 
 typedef struct c_bt_lf_t c_bt_lf_t;
 
-c_bt_lf_t * c_bt_lf_create(int leaky);
+c_bt_lf_t * c_bt_lf_create();
 
 int c_bt_lf_contains(c_bt_lf_t * set, int64_t key);
 int c_bt_lf_add(c_bt_lf_t * set, int64_t key);
-int c_bt_lf_remove(c_bt_lf_t * set, int64_t key);
+int c_bt_lf_remove_leaky(c_bt_lf_t * set, int64_t key);

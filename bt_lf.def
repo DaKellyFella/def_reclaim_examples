@@ -4,6 +4,7 @@
 
 import "stddef.h";
 import "stdio.h";
+import "utils.h";
 
 typedef node_t = {
     key i64,
@@ -189,10 +190,9 @@ begin
     if !unpacked_child.flagged then
         sibling_val = child_val;
         sibling_address = child_address;
-    fi
+    fi    
 
-    __builtin_cas(sibling_address, node_address(sibling_val),
-        node_tag(sibling_val, true));
+    fetch_and_or(cast(type *u64, sibling_address), 2);
     var unpacked_sibbling node_unpacked_t = 
         node_unpack(sibling_address[0]);
     var res = __builtin_cas(successor_address, node_address(successor),

@@ -17,7 +17,6 @@ struct node_t {
 };
 
 struct c_bt_lf_t {
-    bool leaky;
     node_ptr R, S;
 };
 
@@ -81,9 +80,8 @@ static node_unpacked_t c_bt_lf_node_unpack(node_ptr node){
         };
 }
 
-c_bt_lf_t* c_bt_lf_create(int leaky){
+c_bt_lf_t* c_bt_lf_create(){
     c_bt_lf_t * bt_lf = forkscan_malloc(sizeof(c_bt_lf_t));
-    bt_lf->leaky = leaky;
     bt_lf->R = node_create(INT64_MAX);
     bt_lf->S = node_create(INT64_MAX - 1);
     bt_lf->R->left = bt_lf->S;
@@ -171,9 +169,6 @@ static bool cleanup(c_bt_lf_t * set, seek_record_t *sr, int64_t key) {
     bool result = __sync_bool_compare_and_swap(successor_address,
         node_address(successor),
         node_flag(unpacked_sibbling.address, unpacked_sibbling.flagged));
-    if(!set->leaky && result) {
-        forkscan_retire((void *)successor);
-    }
     return result;
 }
 
@@ -225,7 +220,7 @@ int c_bt_lf_add(c_bt_lf_t *set, int64_t key) {
 }
 
 
-int c_bt_lf_remove(c_bt_lf_t * set, int64_t key) {
+int c_bt_lf_remove_leaky(c_bt_lf_t * set, int64_t key) {
     enum REMOVE_STATE mode = INJECTION;
     node_ptr leaf = NULL;
     node_ptr retire_leaf = NULL, retire_parent = NULL;
@@ -252,9 +247,6 @@ int c_bt_lf_remove(c_bt_lf_t * set, int64_t key) {
                 mode = CLEANUP;
                 bool done = cleanup(set, &sr, key);
                 if(done) {
-                    if(!set->leaky) {
-                        forkscan_retire((void*)leaf);
-                    }
                     return true;
                 }
             } else {
@@ -266,16 +258,10 @@ int c_bt_lf_remove(c_bt_lf_t * set, int64_t key) {
             }
         } else {
             if(sr.leaf != leaf) {
-                if(!set->leaky) {
-                    forkscan_retire((void*)leaf);
-                }
                 return true;
             } else {
                 bool done = cleanup(set, &sr, key);
                 if(done) {
-                    if(!set->leaky) {
-                        forkscan_retire((void*)leaf);
-                    }
                     return true;
                 }
             }
