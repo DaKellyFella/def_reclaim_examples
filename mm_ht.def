@@ -36,14 +36,13 @@ end
 
 def find(view *list_view_t, head volatile *node_ptr, key i64, leak bool) -> bool
 begin
-  var nonsese = false;
 retry:
   view.previous = head;
   view.current = view.previous[0];
   while true do
     if unmark(view.current) == nil then return false; fi
     view.next = unmark(view.current).next;
-    var cur_key = unmark(view.current).key;
+    var cur_key i64 = unmark(view.current).key;
     if view.previous[0] != unmark(view.current) then 
       goto retry;
     fi
@@ -93,7 +92,7 @@ def mm_ht_add(set *mm_ht_t, key i64) -> bool
 begin
   var key_hash = hash(key);
   var bucket i64 = key_hash % set.size;
-  var new_node node_ptr= nil;
+  var new_node node_ptr = nil;
   while true do
     var view list_view_t = {nil, nil, nil};
     if find(&view, &set.table[bucket], key, set.leak) then

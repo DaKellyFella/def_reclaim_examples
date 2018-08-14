@@ -70,7 +70,7 @@ typedef per_thread_data_t =
         stats          stats_t
     };
 
-typedef initialisation_thread_data_t =
+typedef init_thread_data_t =
     {
         config        *config_t,
         total_threads i64,
@@ -625,7 +625,7 @@ end
 
 def thread_initialise(arg *void) -> *void 
 begin
-    var thread_data *initialisation_thread_data_t = cast(type *initialisation_thread_data_t, arg);
+    var thread_data *init_thread_data_t = cast(type *init_thread_data_t, arg);
     var config *config_t = thread_data.config;
     var seed u64 = cast(type u64, time(nil)) + thread_data.id;
     var bound = config.init_size;
@@ -712,7 +712,7 @@ begin
         max_threads = 32;
     fi
     printf("Init threads %ld\n", max_threads);
-    var thread_data *initialisation_thread_data_t = new [max_threads]initialisation_thread_data_t;
+    var thread_data *init_thread_data_t = new [max_threads]init_thread_data_t;
     var tids *pthread_t = new [max_threads]pthread_t;
     for var i = 0; i < max_threads; ++i do
         thread_data[i] = {config, max_threads, i};
