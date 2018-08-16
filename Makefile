@@ -59,11 +59,14 @@ set_bench.o: $(DEFIFILES)
 
 priority_bench.o: $(DEFIFILES)
 
-%.o: %.def
-	$(DEF) -o $@ $(DEFFLAGS) -c $<
+%.ll: %.def
+	$(DEF) -o $@ $(DEFFLAGS) -S -emit-llvm $<
 
-%.o: %.c
-	$(CC) -o $@ $(CFLAGS) -c $<
+%.ll: %.c
+	$(CC) -o $@ $(CFLAGS) -S -emit-llvm $<
+
+%.o: %.ll
+	$(DEF) -o $@ $(DEFFLAGS) -c $<
 
 %.defi: %.def
 	$(DEFGHI) $<
