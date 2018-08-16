@@ -158,7 +158,7 @@ begin
     printf("     * c_mm_ht: Use the Maged Michael lock-free hash table in C.\n");
     printf("     * so_ht: Use the Split-Order lock-free hash table in DEF.\n");
     printf("     * c_so_ht: Use the Split-Order lock-free hash table in C.\n");
-    printf("  -p <mem_policy>: Set the memory policy. (default = leaky)\n");
+    printf("  -p <mem_policy>: Set the memory policy. (default = retire)\n");
     printf("     * leaky: Leak removed nodes.\n");
     printf("     * retire: Use Forkscan to reclaim removed nodes.\n");
     printf("  -i <n>: Initial set size. (default = 256)\n");

@@ -138,7 +138,7 @@ begin
     printf("     * c_sl_pq: Fixed-height skip list Shavit Lotan priority queue written in C; lock-free underneath.\n");
     printf("     * spray: Fixed-height skip list based priority queue; lock-free with spray delete min.\n");
     printf("     * c_spray: Fixed-height skip list based priority queue written in C; lock-free with spray delete min.\n");
-    printf("  -p <mem_policy>: Set the memory policy. (default = leaky)\n");
+    printf("  -p <mem_policy>: Set the memory policy. (default = retire)\n");
     printf("     * leaky: Leak removed nodes.\n");
     printf("     * retire: Use Forkscan to reclaim removed nodes.\n");
     printf("  -i <n>: Initial set size. (default = 256)\n");
