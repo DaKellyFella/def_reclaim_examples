@@ -149,7 +149,7 @@ begin
                 marked = is_marked(succ);
                 if i_marked_it then
                     // FIXME: succs[0]?  Should retire node_to_remove?
-                    retire succs[0];
+                    retire node_to_remove;
                     find(set, x, preds, succs);
                     return true;
                 elif marked then

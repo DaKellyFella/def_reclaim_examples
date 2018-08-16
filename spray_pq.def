@@ -41,7 +41,7 @@ begin
   var spray_config spray_pq_config_t = {
     cast(type i64, threads), cast(type i64, log2(threads) + 1),
     cast(type i64, log2(threads) + 1), 1I64, 
-    cast(type i64, log2(log_arg))
+    (threads * cast(type i64, log2(log_arg))) / 2
   };
   return spray_config;
 end

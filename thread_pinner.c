@@ -96,7 +96,7 @@ thread_pinner_t * thread_pinner_create() {
 }
 
 static int pin_thread_to_socket(socket_t *socket, pthread_t thread) {
-  if(socket->current_processor == socket->num_processors) { return 1; }
+  if(socket->current_processor == socket->num_processors) { return false; }
   cpu_set_t cpu_set;
   CPU_ZERO(&cpu_set);
   uint32_t core_id = socket->processor_queue[socket->current_processor++];

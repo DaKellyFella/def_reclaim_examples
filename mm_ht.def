@@ -46,7 +46,7 @@ retry:
     if view.previous[0] != unmark(view.current) then 
       goto retry;
     fi
-    if !is_marked(view.current) then
+    if !is_marked(view.next) then
       if cur_key >= key then
         return cur_key == key;
       fi
@@ -104,7 +104,7 @@ begin
       new_node.key = key;
     fi
     new_node.next = unmark(view.current);
-    if __builtin_cas(view.previous, view.current, new_node) then
+    if __builtin_cas(view.previous, unmark(view.current), new_node) then
       return true;
     fi
   od
@@ -142,7 +142,7 @@ begin
     if !find(&view, &set.table[bucket], key, true) then
       return false;
     fi
-    if !__builtin_cas(&view.current.next, view.next, mark(view.next)) then
+    if !__builtin_cas(&view.current.next, unmark(view.next), mark(view.next)) then
       continue;
     fi
     if !__builtin_cas(view.previous, view.current, unmark(view.next)) then

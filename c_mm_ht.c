@@ -49,14 +49,14 @@ try_again:
     if(*view->previous != unmark(view->current)) {
       goto try_again;
     }
-    if(!is_marked(view->current)) {
+    if(!is_marked(view->next)) {
       if(cur_key >= key) {
         return cur_key == key;
       }
       view->previous = &unmark(view->current)->next;
     } else {
       // Shortened down since it's leaky memory.
-      if(!__sync_bool_compare_and_swap(view->previous, view->current, view->next)) {
+      if(!__sync_bool_compare_and_swap(view->previous, unmark(view->current), unmark(view->next))) {
         goto try_again;
       }
     }
@@ -96,7 +96,7 @@ int c_mm_ht_add(c_mm_ht_t * set, key_t key) {
       new_node->key = key;
     }
     new_node->next = unmark(view.current);
-    if(__sync_bool_compare_and_swap(view.previous, view.current, new_node)) {
+    if(__sync_bool_compare_and_swap(view.previous, unmark(view.current), new_node)) {
       return true;
     }
   }
@@ -110,10 +110,10 @@ int c_mm_ht_remove_leaky(c_mm_ht_t * set, key_t key) {
     if(!find(&view, &set->table[bucket], key)) {
       return false;
     }
-    if(!__sync_bool_compare_and_swap(&view.current->next, view.next, mark(view.next))) {
+    if(!__sync_bool_compare_and_swap(&view.current->next, unmark(view.next), mark(view.next))) {
       continue;
     }
-    if(!__sync_bool_compare_and_swap(view.previous, view.current, unmark(view.next))) {
+    if(!__sync_bool_compare_and_swap(view.previous, unmark(view.current), unmark(view.next))) {
       find(&view, &set->table[bucket], key);
     }
     return true;
