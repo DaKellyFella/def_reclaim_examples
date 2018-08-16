@@ -12,7 +12,7 @@
 #include <math.h>
 
 
-enum STATE {PADDING, ACTIVE, DELETED};
+enum STATE {PADDING, ACTIVE, DELETED, REMOVING};
 
 typedef enum STATE state_t;
 typedef struct node_t node_t;
@@ -77,7 +77,7 @@ config_t c_spray_pq_config_paper(int64_t threads) {
     .start_height = log2(threads) + 1,
     .max_jump = log2(threads) + 1,
     .descend_amount = 1,
-    .padding_amount = log2(log_arg)
+    .padding_amount = (threads * log2(log_arg)) / 2
   };
 }
 
@@ -291,17 +291,19 @@ int c_spray_pq_remove_leaky(c_spray_pq_t *set, int64_t key) {
  * using the underlying spray method for node selection.
  */
 int c_spray_pq_leaky_pop_min(uint64_t *seed, c_spray_pq_t *set) {
-  bool cleaner = (fast_rand(seed) % (set->config.thread_count + 1)) == 0;
+  // bool cleaner = (fast_rand(seed) % (set->config.thread_count + 1)) == 0;
   // if(cleaner) {
   //   // FIXME: Figure out the best constant/value here.
-  //   size_t dist = 0, limit = set->config.padding_amount * set->config.padding_amount;
+  //   size_t dist = 0, limit = set->config.padding_amount;
   //   limit = limit < 30 ? 30 : limit;
   //   for(node_ptr curr =
   //     node_unmark(set->head.next[0]);
   //     curr != &set->tail;
   //     curr = node_unmark(curr->next[0]), dist++){
   //     if(curr->state == DELETED) {
-  //       c_spray_pq_remove_leaky(set, curr->key);
+  //       if(__sync_bool_compare_and_swap(&curr->state, DELETED, REMOVING)) {
+  //         c_spray_pq_remove_leaky(set, curr->key);
+  //       }
   //     }
   //     if(dist == limit) {
   //       break;

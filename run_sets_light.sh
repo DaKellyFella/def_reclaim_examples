@@ -16,13 +16,3 @@
 ./param_set_benchmark.sh $1 mm_ht leaky 32000000 64000000 10
 ./param_set_benchmark.sh $1 mm_ht retire 32000000 64000000 10
 ./param_set_benchmark.sh $1 c_mm_ht leaky 32000000 64000000 10
-
-# Shavit Lotan Priority Queue
-./param_pqueue_benchmark.sh $2 sl_pq leaky 12000000 24000000
-#./param_pqueue_benchmark.sh $2 sl_pq retire 12000000 24000000
-./param_pqueue_benchmark.sh $2 c_sl_pq leaky 12000000 24000000
-
-# SprayList Queue
-./param_pqueue_benchmark.sh $2 spray leaky 12000000 24000000
-#./param_pqueue_benchmark.sh $2 sl_pq retire 12000000 24000000
-./param_pqueue_benchmark.sh $2 c_spray leaky 12000000 24000000

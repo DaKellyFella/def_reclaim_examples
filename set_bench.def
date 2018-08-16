@@ -722,46 +722,15 @@ begin
             exit(1);
         fi
     od
+    printf("joining initialisation threads...\n");
     for var i = 0; i < max_threads; ++i do
         var ret = pthread_join(tids[i], nil);
         if ret != 0 then
             printf("error: failed to join thread id: %d\n", i);
             exit(1);
         fi
-        printf("[joined thread %d]\n", i);
     od
-    // Paranoia
-    /*printf("Checking...\n");
-    var missing = 0;
-    for var val = 0; val < config.upper_bound; val++ do
-        var res = false;
-        switch config.benchmark with
-        xcase FHSL_LF:
-            res = fhsl_lf_contains(config.structure, val);
-        xcase C_FHSL_LF:
-            res = c_fhsl_lf_contains(config.structure, val) == 1;
-        xcase BT_LF:
-            res = bt_lf_contains(config.structure, val);
-        xcase C_BT_LF:
-            res = c_bt_lf_contains(config.structure, val) == 1;
-        xcase MM_HT:
-            res = mm_ht_contains(config.structure, val);
-        xcase C_MM_HT:
-            res = c_mm_ht_contains(config.structure, val) == 1;
-        xcase SO_HT:
-            res = so_ht_contains(config.structure, val);
-        xcase C_SO_HT:
-            res = c_so_ht_contains(config.structure, val) == 1;
-        xcase _:
-            printf("error: unable to initialize unknown set.\n");
-        esac
-        if !res then
-            missing++;
-        fi
-    od
-    if missing != (config.upper_bound - config.init_size) then
-        printf("Set isn't thread safe\n");
-    fi*/
+    printf("initialisation threads joined\n");
     delete thread_data;
     delete tids;
 end
@@ -814,15 +783,16 @@ begin
     state = STATE_END;
 
     puts("ending");
-    printf("Joining threads.\n");
+    printf("Joining benchmark threads...\n");
     for var i = 0; i < config.thread_count; ++i do
         var ret = pthread_join(tids[i], nil);
         if ret != 0 then
             printf("error: failed to join thread id: %d\n", i);
             exit(1);
         fi
-        printf("[joined thread %d]\n", i);
     od
+    printf("joined benchmark threads\n");
+    
     var runtime = hires_timer() - start_time;
 
     // Print out the statistics.

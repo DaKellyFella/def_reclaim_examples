@@ -168,7 +168,7 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   bar2 = ax.bar(ind, def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
   # loc = plticker.MultipleLocator(base=20) # this locator puts ticks at regular intervals
   # ax.yaxis.set_major_locator(loc)
-  ax.set_ylim(0,130)
+  ax.set_ylim(0,500)
   # ax.set_xlim(-width,len(ind)+width)
   ax.set_xlim(-width * 2,len(ind))
   ax.set_ylabel('Percentage')
@@ -233,8 +233,10 @@ def main():
     os.makedirs('figures')
   set_results = parse_file('set_keys.csv', 'set_data.csv')
   plt.rcParams['axes.facecolor'] = (1, 1, 230.0 / 255.0)
+  # plt.rcParams['savefig.facecolor'] = (227.0 / 255.0, 242.0 / 255.0, 231.0 / 255.0)
   # plt.rcParams['savefig.facecolor'] = (178.0 / 255.0, 192.0 / 255.0, 181.0 / 255.0) ash grey
-  plt.rcParams['savefig.facecolor'] = (227.0 / 255.0, 242.0 / 255.0, 231.0 / 255.0)
+  # plt.rcParams['savefig.facecolor'] = (227.0 / 255.0, 242.0 / 255.0, 231.0 / 255.0)
+  plt.rcParams['savefig.facecolor'] = 'white'
   for config in set_results:
     create_line_plots(config, set_results)
   

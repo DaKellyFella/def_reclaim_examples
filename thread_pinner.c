@@ -83,14 +83,14 @@ thread_pinner_t * thread_pinner_create() {
   }
   
   uint32_t num_sockets = cpuinfo_get_clusters_count();
-  printf("Num sockets: %d\n", num_sockets);
+  // printf("Num sockets: %d\n", num_sockets);
   for(uint32_t current_socket = 0;
     current_socket < num_sockets;
     current_socket++) {
       const struct cpuinfo_cluster *socket = sockets + current_socket;
       pinner->sockets[current_socket].socket_id = current_socket;
       populate_socket(&pinner->sockets[current_socket], socket);
-      print_socket(&pinner->sockets[current_socket]);
+      // print_socket(&pinner->sockets[current_socket]);
   }
   return pinner;
 }
@@ -101,7 +101,7 @@ static int pin_thread_to_socket(socket_t *socket, pthread_t thread) {
   CPU_ZERO(&cpu_set);
   uint32_t core_id = socket->processor_queue[socket->current_processor++];
   CPU_SET(core_id, &cpu_set);
-  printf("Pinning thread to processor: %d\n", core_id);
+  // printf("Pinning thread to processor: %d\n", core_id);
   return pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpu_set) == 0;
 }
 
