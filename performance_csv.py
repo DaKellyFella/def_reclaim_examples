@@ -93,7 +93,7 @@ def create_line_plots(config, perf_results):
   plt.xlabel('Thread Count')
   plt.xscale('linear')
   plt.autoscale(enable=True, axis='both', tight=None)
-  plt.grid(b=True, which='major', color='black', linestyle='-')
+  plt.grid(b=True, which='major', color='#ccbc8a', linestyle='-')
   legends_list = []
   max_ops, min_ops = 0, 0
   for lang_config in sorted(lang_results.keys()):
@@ -173,10 +173,10 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   ind = range(len(def_norms))
   off_ind = [x +width for x in ind]
   plt.title('Normalised data-structure performance.')
-  plt.grid(b=True, which='major', color='black', linestyle='-')
   ax = plt.gca()
+  ax.yaxis.grid(b=True, which='major', color='#ccbc8a', linestyle='-', zorder = 0)
   # bar1 = ax.bar(range(len(def_norms)), def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
-  bar2 = ax.bar(ind, def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
+  bar2 = ax.bar(ind, def_norms, width, color=lang_map['DEF leaky']['graph_colour'], zorder = 3)
   # loc = plticker.MultipleLocator(base=20) # this locator puts ticks at regular intervals
   # ax.yaxis.set_major_locator(loc)
   ax.set_ylim(0,140)
