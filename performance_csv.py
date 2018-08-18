@@ -79,7 +79,12 @@ def collate_threads(data):
   return thread_ops
 
 def create_line_plots(config, perf_results):
-  fig = plt.figure()
+  plt.rc('font', size = 22);
+  plt.rc('legend', fontsize = 16);
+  plt.rc('xtick', labelsize = 16);
+  plt.rc('ytick', labelsize = 16);
+
+  fig = plt.figure(figsize = (10, 6), dpi = 100)
   # plt.rcParams['axes.facecolor'] = (230.0 / 255.0, 1, 1)
 
   (structure_name, lang_results, filename) = perf_results[config]
@@ -157,7 +162,13 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   for (def_res, c_res) in zip(def_numbers, c_numbers):
     def_norms.append((def_res / c_res) * 100.0)
     c_norms.append(100.0)
-  fig = plt.figure()
+
+  plt.rc('font', size = 32);
+  plt.rc('legend', fontsize = 22);
+  plt.rc('xtick', labelsize = 22);
+  plt.rc('ytick', labelsize = 22);
+
+  fig = plt.figure(figsize = (16, 9), dpi = 100)
   width = 0.30
   ind = range(len(def_norms))
   off_ind = [x +width for x in ind]
@@ -171,11 +182,14 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   ax.set_ylim(0,140)
   # ax.set_xlim(-width,len(ind)+width)
   ax.set_xlim(-width * 2,len(ind))
-  ax.set_ylabel('Percentage')
-  ax.set_title('DEF relative to C (both leaky)')
+  ax.set_ylabel('Relative Performance %')
+  ax.set_title('Single Core: DEF relative to C')
   ax.set_xticks([x + (width / 2) for x in ind])
   xtickNames = ax.set_xticklabels(structures)
   plt.setp(xtickNames, rotation=45, fontsize=10)
+
+  for tick in ax.xaxis.get_major_ticks():
+    tick.label.set_fontsize(18)
 
   ## add a legend
   ax.legend( [bar2], ['DEF'] )
