@@ -1,18 +1,27 @@
 #!/bin/bash
 
-#  $1 is the set benchmark binary, $2 is the pqueue benchmark binary.
+#  $1 is the set benchmark binary.
+
+SKIPLIST_SIZE=1280000
+SKIPLIST_RANGE=2560000
+
+BINARY_TREE_SIZE=1280000
+BINARY_TREE_RANGE=2560000
+
+HASH_TABLE_SIZE=3200000
+HASH_TABLE_RANGE=6400000
 
 # Lock-Free Skip List
-./param_set_benchmark.sh $1 fhsl_lf leaky 12800000 25600000 10
-./param_set_benchmark.sh $1 fhsl_lf retire 12800000 25600000 10
-./param_set_benchmark.sh $1 c_fhsl_lf leaky 12800000 25600000 10
+./param_set_benchmark.sh $1 fhsl_lf leaky $SKIPLIST_SIZE $SKIPLIST_RANGE 10
+./param_set_benchmark.sh $1 fhsl_lf retire $SKIPLIST_SIZE $SKIPLIST_RANGE 10
+./param_set_benchmark.sh $1 c_fhsl_lf leaky $SKIPLIST_SIZE $SKIPLIST_RANGE 10
 
 # Lock-Free Binary Tree
-./param_set_benchmark.sh $1 bt_lf leaky 12000000 24000000 10
-./param_set_benchmark.sh $1 bt_lf retire 12000000 24000000 10
-./param_set_benchmark.sh $1 c_bt_lf leaky 12000000 24000000 10
+./param_set_benchmark.sh $1 bt_lf leaky $BINARY_TREE_SIZE $BINARY_TREE_RANGE 10
+./param_set_benchmark.sh $1 bt_lf retire $BINARY_TREE_SIZE $BINARY_TREE_RANGE 10
+./param_set_benchmark.sh $1 c_bt_lf leaky $BINARY_TREE_SIZE $BINARY_TREE_RANGE 10
 
 # Maged Michael Hash Table
-./param_set_benchmark.sh $1 mm_ht leaky 32000000 64000000 10
-./param_set_benchmark.sh $1 mm_ht retire 32000000 64000000 10
-./param_set_benchmark.sh $1 c_mm_ht leaky 32000000 64000000 10
+./param_set_benchmark.sh $1 mm_ht leaky $HASH_TABLE_SIZE $HASH_TABLE_RANGE 10
+./param_set_benchmark.sh $1 mm_ht retire $HASH_TABLE_SIZE $HASH_TABLE_RANGE 10
+./param_set_benchmark.sh $1 c_mm_ht leaky $HASH_TABLE_SIZE $HASH_TABLE_RANGE 10

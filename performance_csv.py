@@ -137,13 +137,13 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
     (structure_name, lang_results, _) = pqueue_results[config]
     for lang_config in sorted(lang_results.keys()):
       (policy, raw_name, data) = lang_results[lang_config]
+      print "Raw data: ", data
       thread_ops = collate_threads(data)
       lang = structure_map[raw_name]['lang']
       if lang == 'DEF' and policy == 'leaky':
         def_results[structure_name] = mean(thread_ops[1])
-      else:
+      elif lang == 'C':
         c_results[structure_name] = mean(thread_ops[1])
-  
   structures = []
   def_numbers = []
   c_numbers = []
@@ -168,7 +168,7 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   bar2 = ax.bar(ind, def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
   # loc = plticker.MultipleLocator(base=20) # this locator puts ticks at regular intervals
   # ax.yaxis.set_major_locator(loc)
-  ax.set_ylim(0,500)
+  ax.set_ylim(0,140)
   # ax.set_xlim(-width,len(ind)+width)
   ax.set_xlim(-width * 2,len(ind))
   ax.set_ylabel('Percentage')
@@ -241,6 +241,7 @@ def main():
     create_line_plots(config, set_results)
   
   pqueue_results = parse_file('pqueue_keys.csv', 'pqueue_data.csv')
+  print pqueue_results
   for config in pqueue_results:
     create_line_plots(config, pqueue_results)
   
