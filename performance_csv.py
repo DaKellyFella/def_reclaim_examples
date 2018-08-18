@@ -188,6 +188,7 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   ax.set_title('Single Core: DEF relative to C')
   ax.set_xticks([x + (width / 2) for x in ind])
   xtickNames = ax.set_xticklabels(structures)
+  ax.axhline(y = 100, lw = 4, color = 'red')
   plt.setp(xtickNames, rotation=45, fontsize=18)
 
   ## add a legend
