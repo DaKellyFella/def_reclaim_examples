@@ -121,6 +121,8 @@ def create_line_plots(config, perf_results):
   # plt.gca().set_facecolor((0, 0, 0.25))
   plt.legend(loc='best', fancybox=True, shadow=True, handles = legends_list, ncol = 3)
 
+  plt.xlim(0, 144)
+  plt.ylim(ymin = 0)
   fig.savefig('./figures/' + filename + '.pdf', bbox_inches='tight')
 
 def create_calibrating_bar_plots(set_results, pqueue_results):
