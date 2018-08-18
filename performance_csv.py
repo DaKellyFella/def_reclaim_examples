@@ -165,7 +165,7 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
     def_norms.append((def_res / c_res) * 100.0)
     c_norms.append(100.0)
 
-  plt.rc('font', size = 32);
+  plt.rc('font', size = 22);
   plt.rc('legend', fontsize = 22);
   plt.rc('xtick', labelsize = 22);
   plt.rc('ytick', labelsize = 22);
