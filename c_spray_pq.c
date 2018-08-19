@@ -311,10 +311,10 @@ int c_spray_pq_leaky_pop_min(uint64_t *seed, c_spray_pq_t *set) {
   //   }
   //   //c_spray_pq_print(set);
   // }
-  bool empty = set->head.next[0] == &set->tail;
-  if(empty) {
-    return false;
-  }
+  // bool empty = set->head.next[0] == &set->tail;
+  // if(empty) {
+  //   return false;
+  // }
 
   node_ptr node = spray(seed, set);
   for(; node != &set->tail; node = node_unmark(node->next[0])) {

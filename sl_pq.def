@@ -21,14 +21,6 @@ typedef node =
       next     [20]node_ptr    // Follow-list of nodes.
     };
 
-def node_create(val i64, level i32) -> node_ptr
-begin
-    var node node_ptr = new node;
-    node.val = val;
-    node.toplevel = level;
-    node.state = ACTIVE;
-    return node;
-end
 
 export opaque
 typedef sl_pq_t =
@@ -83,14 +75,19 @@ begin
         var node = new node;
         node.val = x;
         node.toplevel = toplevel;
-        if node == nil then node = node_create(x, toplevel); fi
+        //if node == nil then node = node_create(x, toplevel); fi
+        if node == nil then
+            node = new node;
+            node.val = x;
+            node.toplevel = toplevel;
+            node.state = ACTIVE;
+        fi
         for var i = 0; i <= toplevel; ++i do
             node.next[i] = unmark(succs[i]);
         od
         var pred = preds[0];
         var succ = succs[0];
         if !__builtin_cas(&pred.next[0], unmark(succ), node) then
-            delete node;
             continue;
         fi
         for var i = 1; i <= toplevel; ++i do
@@ -142,8 +139,8 @@ begin
             succ = succs[0].next[0];
             marked = is_marked(succ);
             if i_marked_it then
+                retire succs[0];
                 find(set, x, preds, succs);
-                retire node_to_remove;
                 return true;
             elif marked then
                 return false;
@@ -228,9 +225,13 @@ begin
             continue;
         fi
         var res = __builtin_cas(&curr.state, ACTIVE, DELETED);
-        if res then
+        if res then 
             // Physically delete the node now.
-            return sl_pq_remove(set, curr.val);
+            var removed = sl_pq_leaky_remove(set, curr.val);
+            if removed then
+                retire unmark(curr);
+            fi
+            return true;
         fi
     od
     return false;

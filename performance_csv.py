@@ -127,6 +127,7 @@ def create_line_plots(config, perf_results):
 
 def create_calibrating_bar_plots(set_results, pqueue_results):
   # All structures into one bar plot.
+  leaky_def_results = {}
   def_results = {}
   c_results = {}
   for config in set_results:
@@ -136,6 +137,8 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
       thread_ops = collate_threads(data)
       lang = structure_map[raw_name]['lang']
       if lang == 'DEF' and policy == 'leaky':
+        leaky_def_results[structure_name] = mean(thread_ops[1])
+      elif lang == 'DEF' and policy == 'retire':
         def_results[structure_name] = mean(thread_ops[1])
       else:
         c_results[structure_name] = mean(thread_ops[1])
@@ -144,25 +147,30 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
     (structure_name, lang_results, _) = pqueue_results[config]
     for lang_config in sorted(lang_results.keys()):
       (policy, raw_name, data) = lang_results[lang_config]
-      print "Raw data: ", data
       thread_ops = collate_threads(data)
       lang = structure_map[raw_name]['lang']
       if lang == 'DEF' and policy == 'leaky':
+        leaky_def_results[structure_name] = mean(thread_ops[1])
+      elif lang == 'DEF' and policy == 'retire':
         def_results[structure_name] = mean(thread_ops[1])
       elif lang == 'C':
         c_results[structure_name] = mean(thread_ops[1])
   structures = []
+  leaky_def_numbers = []
   def_numbers = []
   c_numbers = []
-  for structure in def_results:
+  for structure in leaky_def_results:
     structures.append('\n'.join(wrap(structure, 12)))
+    leaky_def_numbers.append(leaky_def_results[structure])
     def_numbers.append(def_results[structure])
     c_numbers.append(c_results[structure])
   
   def_norms = []
+  leaky_def_norms = []
   c_norms = []
-  for (def_res, c_res) in zip(def_numbers, c_numbers):
+  for (def_res, leaky_def_res, c_res) in zip(def_numbers, leaky_def_numbers, c_numbers):
     def_norms.append((def_res / c_res) * 100.0)
+    leaky_def_norms.append((leaky_def_res / c_res) * 100.0)
     c_norms.append(100.0)
 
   plt.rc('font', size = 22);
@@ -171,14 +179,14 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   plt.rc('ytick', labelsize = 22);
 
   fig = plt.figure(figsize = (16, 9), dpi = 100)
-  width = 0.30
+  width = 0.4
   ind = range(len(def_norms))
   off_ind = [x +width for x in ind]
   plt.title('Normalised data-structure performance.')
   ax = plt.gca()
   ax.yaxis.grid(b=True, which='major', color='#ccbc8a', linestyle='-', zorder = 0)
-  # bar1 = ax.bar(range(len(def_norms)), def_norms, width, color=lang_map['DEF leaky']['graph_colour'])
-  bar2 = ax.bar(ind, def_norms, width, color=lang_map['DEF leaky']['graph_colour'], zorder = 3)
+  bar1 = ax.bar(ind, def_norms, width, color=lang_map['DEF retire']['graph_colour'])
+  bar2 = ax.bar(off_ind, leaky_def_norms, width, color=lang_map['DEF leaky']['graph_colour'], zorder = 3)
   # loc = plticker.MultipleLocator(base=20) # this locator puts ticks at regular intervals
   # ax.yaxis.set_major_locator(loc)
   ax.set_ylim(0,140)
@@ -192,7 +200,7 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   plt.setp(xtickNames, rotation=45, fontsize=18)
 
   ## add a legend
-  ax.legend( [bar2], ['DEF'] )
+  ax.legend( [bar1, bar2], ['DEF retire' 'DEF leaky'] )
   plt.savefig('./figures/RelativePerf.pdf', bbox_inches='tight')
 
 def parse_file(key, data):
@@ -255,7 +263,6 @@ def main():
     create_line_plots(config, set_results)
   
   pqueue_results = parse_file('pqueue_keys.csv', 'pqueue_data.csv')
-  print pqueue_results
   for config in pqueue_results:
     create_line_plots(config, pqueue_results)
   
