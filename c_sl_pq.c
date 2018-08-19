@@ -227,7 +227,8 @@ int c_sl_pq_leaky_pop_min(c_sl_pq_t * set) {
         continue;
       }
       if(__sync_bool_compare_and_swap(&curr->deleted, false, true)){
-        return c_sl_pq_remove_leaky(set, curr->key);
+        bool res = c_sl_pq_remove_leaky(set, curr->key);
+        return true;
       }
     }
   }

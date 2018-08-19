@@ -8,7 +8,6 @@ from textwrap import wrap
 def mean(numbers):
     return float(sum(numbers)) / max(len(numbers), 1)
 
-
 # A map translating from the structure name to its 
 # [category / nice name, lang, graphing style, and graphing colour]
 structure_map = {

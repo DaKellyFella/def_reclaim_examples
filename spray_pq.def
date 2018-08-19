@@ -16,7 +16,7 @@ typedef node_t =
       priority i64,                 // Key.
       toplevel i32,                 // Height.
       state volatile node_state_t,
-      next     [20]*node_t          // Follow-list of nodes.
+      next     [20]volatile*volatile node_t          // Follow-list of nodes.
     };
 
 export opaque
@@ -131,10 +131,10 @@ end
 export
 def spray_pq_add (seed *u64, set *spray_pq_t, priority i64) -> bool
 begin
-    var preds [20]*node_t;
-    var succs [20]*node_t;
+    var preds [20]volatile*volatile node_t;
+    var succs [20]volatile*volatile node_t;
     var toplevel = random_level(seed, 20);
-    var node *node_t = nil;
+    var node volatile*volatile node_t = nil;
             //node.priority = priority;
             //node.toplevel = toplevel;
             //node.state = ACTIVE;
@@ -179,9 +179,9 @@ end
 export
 def spray_pq_remove (set *spray_pq_t, x i64) -> bool
 begin
-    var preds [20]*node_t;
-    var succs [20]*node_t;
-    var succ *node_t;
+    var preds [20]volatile*volatile node_t;
+    var succs [20]volatile*volatile node_t;
+    var succ volatile*volatile node_t;
     while true do
         if false == find(set, x, preds, succs) then
             return false;
@@ -226,9 +226,9 @@ end
 export
 def spray_pq_leaky_remove (set *spray_pq_t, x i64) -> bool
 begin
-    var preds [20]*node_t;
-    var succs [20]*node_t;
-    var succ *node_t;
+    var preds [20]volatile*volatile node_t;
+    var succs [20]volatile*volatile node_t;
+    var succ volatile*volatile node_t;
     while true do
         if false == find(set, x, preds, succs) then
             return false;
@@ -271,28 +271,6 @@ end
 export
 def spray_pq_pop_min (seed *u64, set *spray_pq_t) -> bool
 begin
-    /*var cleaner = (fast_rand(seed) % (set.config.thread_count + 1)) == 0;
-    if cleaner then
-        var dist = 0;
-        var limit = set.config.padding_amount * set.config.padding_amount;
-        if limit < 30 then
-            limit = 30;
-        fi
-        for var curr = unmark(set.head.next[0]); curr != &set.tail; curr = unmark(curr.next[0]) do
-            if curr.state == DELETED then
-                spray_pq_remove(set, curr.priority);
-            fi
-            if dist++ == limit then
-                break;
-            fi
-        od
-    fi*/
-
-  var empty bool = set.head.next[0] == &set.tail;
-  if empty then
-      return false;
-  fi
-
   
   for var node = spray(seed, set); node != &set.tail; node = unmark(node.next[0]) do
     
@@ -353,9 +331,9 @@ begin
     return level - 1;
 end
 
-def spray (seed *u64, set *spray_pq_t) -> *node_t
+def spray (seed *u64, set *spray_pq_t) -> volatile*volatile node_t
 begin
-  var cur_node *node_t = set.padding_head;
+  var cur_node volatile*volatile node_t = set.padding_head;
   var D = set.config.descend_amount;
   for var H = set.config.start_height; H >= 0; H = H - D do
     var jump = fast_rand(seed) % (set.config.max_jump + 1);
@@ -370,10 +348,10 @@ begin
   return cur_node;
 end 
 
-def find (set *spray_pq_t, priority i64, preds [20]*node_t, succs [20]*node_t) -> bool
+def find (set *spray_pq_t, priority i64, preds [20]volatile*volatile node_t, succs [20]volatile*volatile node_t) -> bool
 begin
     var marked, snip bool;
-    var pred, curr, succ *node_t = nil, nil, nil;
+    var pred, curr, succ volatile*volatile node_t = nil, nil, nil;
 retry:
     while true do
         pred = &set.head;
@@ -401,14 +379,14 @@ retry:
     od
 end
 
-def ref_and_markbit (ptr *node_t) -> { *node_t, bool } =
+def ref_and_markbit (ptr volatile*volatile node_t) -> { volatile*volatile node_t, bool } =
     { unmark(ptr), is_marked(ptr) };
 
-def mark (ptr *node_t) -> *node_t =
-    cast(type *node_t, 0x1I64 | cast(type i64, ptr));
+def mark (ptr volatile*volatile node_t) -> volatile*volatile node_t =
+    cast(type volatile*volatile node_t, 0x1I64 | cast(type i64, ptr));
 
-def unmark (ptr *node_t) -> *node_t =
-    cast(type *node_t, 0xFFFFFFFFFFFFFFFEI64 & cast(type i64, ptr));
+def unmark (ptr volatile*volatile node_t) -> volatile*volatile node_t =
+    cast(type volatile*volatile node_t, 0xFFFFFFFFFFFFFFFEI64 & cast(type i64, ptr));
 
-def is_marked (ptr *node_t) -> bool =
+def is_marked (ptr volatile*volatile node_t) -> bool =
     cast(type bool, 0x1I64 & cast(type i64, ptr));
