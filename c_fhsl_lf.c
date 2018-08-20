@@ -126,7 +126,8 @@ retry:
           if(!snip) {
             goto retry;
           }
-          raw_node = pred->next[level];
+          curr = node_unmark(pred->next[level]);
+          raw_node = curr->next[level];
           marked = node_is_marked(raw_node);
           succ = node_unmark(raw_node);
         }

@@ -114,15 +114,20 @@ begin
     // Insert dummy nodes
     spray_pqueue.padding_head = &spray_pqueue.head;
     printf("PADDING AMOUNT %d\n", config.padding_amount);
+    printf("START HEIGHT %d\n", config.start_height);
+    printf("MAX JUMP %d\n", config.max_jump);
+    printf("DESCEND AMOUNT %d\n", config.descend_amount);
     for var i = 1; i < config.padding_amount; ++i do
         var padding_node = new node_t;
         padding_node.state = PADDING;
+        padding_node.priority = 0x8000000000000000I64; 
         // Dummy nodes are fully connected.
         for var j = 0; j < 20; ++j do
             padding_node.next[j] = spray_pqueue.padding_head;
         od
         spray_pqueue.padding_head = padding_node;
     od
+    spray_pq_print(spray_pqueue);
     return spray_pqueue;
 end
 
@@ -135,10 +140,6 @@ begin
     var succs [20]volatile*volatile node_t;
     var toplevel = random_level(seed, 20);
     var node volatile*volatile node_t = nil;
-            //node.priority = priority;
-            //node.toplevel = toplevel;
-            //node.state = ACTIVE;
-            
     while true do
         if find(set, priority, preds, succs) then
             delete node;
@@ -171,7 +172,6 @@ begin
             return true;
         fi
     od
-    return true;
 end
 
 /** Remove a node, lock-free, from the skiplist.
@@ -282,7 +282,9 @@ begin
     var res = __builtin_cas(&node.state, ACTIVE, DELETED);
     // We didn't delete a node from the list.
     if res then
-      return spray_pq_remove(set, node.priority);
+      var removed = spray_pq_leaky_remove(set, node.priority);
+      if removed then retire node; fi
+      return true;
     fi
   od
   return false;
@@ -333,16 +335,18 @@ end
 
 def spray (seed *u64, set *spray_pq_t) -> volatile*volatile node_t
 begin
-  var cur_node volatile*volatile node_t = set.padding_head;
+  var tail = &set.tail;
+  var cur_node volatile*volatile node_t = unmark(set.padding_head);
   var D = set.config.descend_amount;
   for var H = set.config.start_height; H >= 0; H = H - D do
-    var jump = fast_rand(seed) % (set.config.max_jump + 1);
-    while jump-- > 0 do
+    var jump i64 = fast_rand(seed) % (set.config.max_jump + 1);
+    while jump > 0 do
       var next = unmark(cur_node.next[H]);
-      if next == nil then
+      if next == nil || next == tail then
         break;
       fi
       cur_node = next;
+      jump--;
     od
   od
   return cur_node;

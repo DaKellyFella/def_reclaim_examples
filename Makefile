@@ -19,7 +19,8 @@ DEF_SETS = \
 
 DEF_PQUEUES = \
 	sl_pq.def \
-	spray_pq.def
+	spray_pq.def \
+	lj_pq.def
 
 C_SETS = \
 	c_fhsl_lf.c \
@@ -29,7 +30,8 @@ C_SETS = \
 
 C_PQUEUES = \
 	c_sl_pq.c \
-	c_spray_pq.c
+	c_spray_pq.c \
+	c_lj_pq.c
 
 DEFIFILES = $(DEF_SETS:.def=.defi) $(DEF_PQUEUES:.def=.defi)
 

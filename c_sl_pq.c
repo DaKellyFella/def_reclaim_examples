@@ -123,7 +123,7 @@ retry:
             goto retry;
           }
           curr = node_unmark(pred->next[level]);
-          unpacked_node = node_unpack(curr->next[level]);
+          unpacked_node = node_unpack(curr);
           succ = unpacked_node.address;
           marked = unpacked_node.marked;
         }

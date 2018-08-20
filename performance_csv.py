@@ -90,7 +90,7 @@ def create_line_plots(config, perf_results):
   plt.title(config)
   plt.ylabel(r'Total Ops / $\mu$s')
   plt.xlabel('Thread Count')
-  plt.xscale('linear')
+  # plt.xscale('linear')
   plt.autoscale(enable=True, axis='both', tight=None)
   plt.grid(b=True, which='major', color='#ccbc8a', linestyle='-')
   legends_list = []
@@ -101,27 +101,30 @@ def create_line_plots(config, perf_results):
     y_ticks = [0]
     y_error = [0]
     x_ticks = [0]
-    # if lang_config == 'DEF leaky':
-    #   continue
+    thread_points = [0]
 
     for threads in range(1, max(thread_ops) + 1):
       if threads in thread_ops:
         y_ticks.append(mean(thread_ops[threads]))
         y_error.append(max(thread_ops[threads]) - min(thread_ops[threads]))
-        x_ticks.append(threads)
+        thread_points.append(threads)
     style_info = lang_map[lang_config]
     max_ops = max(max(y_ticks), max_ops)
     min_ops = min(min(y_ticks), min_ops)
     legends_list.append(
-      plt.errorbar(x = x_ticks, y = y_ticks, yerr = y_error, linewidth=2,
+      plt.errorbar(x = range(len(thread_points)), y = y_ticks, linewidth=2,
         label = lang_config, color = style_info['graph_colour'], marker = style_info['graph_style'], markersize=7))
-  loc = plticker.MultipleLocator(base=18) # this locator puts ticks at regular intervals
-  plt.gca().xaxis.set_major_locator(loc)
   # plt.gca().set_facecolor((0, 0, 0.25))
   plt.legend(loc='best', fancybox=True, shadow=True, handles = legends_list, ncol = 3)
-
-  plt.xlim(0, 144)
   plt.ylim(ymin = 0)
+  x_ticks = [0, 1, 2, 3, 4, 9] + range(18, 153, 18)
+  x_ranges = [0, 1, 2, 3, 4, 5] + range(6, len(x_ticks) * 2, 2)
+  plt.gca().xaxis.set_ticks(x_ranges) #set the ticks to be a
+  plt.gca().xaxis.set_ticklabels(x_ticks) # change the ticks' names to x
+  # plt.gca().tick_params(axis='both', which='major', pad=15)
+  plt.xlim(0, len(thread_points))
+  # loc = plticker.MultipleLocator(base=2) # this locator puts ticks at regular intervals
+  # plt.gca().xaxis.set_major_locator(loc)
   fig.savefig('./figures/' + filename + '.pdf', bbox_inches='tight')
 
 def create_calibrating_bar_plots(set_results, pqueue_results):
@@ -163,7 +166,6 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
     leaky_def_numbers.append(leaky_def_results[structure])
     def_numbers.append(def_results[structure])
     c_numbers.append(c_results[structure])
-  
   def_norms = []
   leaky_def_norms = []
   c_norms = []
@@ -178,14 +180,14 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   plt.rc('ytick', labelsize = 22);
 
   fig = plt.figure(figsize = (16, 9), dpi = 100)
-  width = 0.4
+  width = 0.25
   ind = range(len(def_norms))
   off_ind = [x +width for x in ind]
   plt.title('Normalised data-structure performance.')
   ax = plt.gca()
-  ax.yaxis.grid(b=True, which='major', color='#ccbc8a', linestyle='-', zorder = 0)
-  bar1 = ax.bar(ind, def_norms, width, color=lang_map['DEF retire']['graph_colour'])
-  bar2 = ax.bar(off_ind, leaky_def_norms, width, color=lang_map['DEF leaky']['graph_colour'], zorder = 3)
+  ax.yaxis.grid(b=True, which='major', color='#ccbc8a', linestyle='-', zorder = 1)
+  bar1 = ax.bar(ind, def_norms, width, color=lang_map['DEF retire']['graph_colour'], zorder = 0)
+  bar2 = ax.bar(off_ind, leaky_def_norms, width, color=lang_map['DEF leaky']['graph_colour'], zorder = 0)
   # loc = plticker.MultipleLocator(base=20) # this locator puts ticks at regular intervals
   # ax.yaxis.set_major_locator(loc)
   ax.set_ylim(0,140)
@@ -199,7 +201,7 @@ def create_calibrating_bar_plots(set_results, pqueue_results):
   plt.setp(xtickNames, rotation=45, fontsize=18)
 
   ## add a legend
-  ax.legend( [bar1, bar2], ['DEF retire' 'DEF leaky'] )
+  ax.legend( [bar1, bar2], ['DEF retire', 'DEF leaky'] )
   plt.savefig('./figures/RelativePerf.pdf', bbox_inches='tight')
 
 def parse_file(key, data):

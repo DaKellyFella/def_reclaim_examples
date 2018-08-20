@@ -42,7 +42,7 @@ struct node_unpacked_t {
   node_ptr address;
 };
 
-node_ptr node_create(int64_t key, int32_t toplevel, state_t state){
+static node_ptr node_create(int64_t key, int32_t toplevel, state_t state){
   node_ptr node = forkscan_malloc(sizeof(node_t));
   node->key = key;
   node->toplevel = toplevel;
@@ -187,18 +187,18 @@ retry:
     for(int64_t level = N - 1; level >= 0; --level) {
       curr = node_unmark(pred->next[level]);
       while(true) {
-        node_unpacked_t unpacked_node = c_spray_pqueue_node_unpack(curr->next[level]);
-        succ = unpacked_node.address;
-        marked = unpacked_node.marked;
-        while(unpacked_node.marked) {
+        node_ptr raw_node = curr->next[level];
+        marked = node_is_marked(raw_node);
+        succ = node_unmark(raw_node);
+        while(marked) {
           snip = __sync_bool_compare_and_swap(&pred->next[level], curr, succ);
           if(!snip) {
             goto retry;
           }
           curr = node_unmark(pred->next[level]);
-          unpacked_node = c_spray_pqueue_node_unpack(curr->next[level]);
-          succ = unpacked_node.address;
-          marked = unpacked_node.marked;
+          raw_node = curr->next[level];
+          marked = node_is_marked(raw_node);
+          succ = node_unmark(raw_node);
         }
         if(curr->key < key) {
           pred = curr;

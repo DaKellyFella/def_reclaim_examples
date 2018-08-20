@@ -11,12 +11,16 @@ import "sl_pq.defi";
 import "c_sl_pq.h";
 import "spray_pq.defi";
 import "c_spray_pq.h";
+import "lj_pq.defi";
+import "c_lj_pq.h";
 
 typedef benchmark_t = enum
     | SL_PQ
     | C_SL_PQ
     | SPRAY
     | C_SPRAY
+    | LJ_PQ
+    | C_LJ_PQ
     ;
 
 typedef memory_policy_t = enum
@@ -81,17 +85,6 @@ begin
     return sec + nsec / (1000.0 * 1000.0 * 1000.0);
 end
 
-def fetch_and_add(counter *volatile i64) -> i64
-begin
-    var val = counter[0];
-    while true do
-        if __builtin_cas(counter, val, val + 1) then
-            return val;
-        fi
-        val = counter[0];
-    od
-end
-
 def fast_rand (seed *u64) -> u64
 begin
     var val = seed[0];
@@ -134,10 +127,12 @@ begin
     printf("  -t <n>: Set the number of threads. (default = 1)\n");
     printf("  -d <n>: Benchmark duration in seconds. (default = 1)\n");
     printf("  -b <benchmark>: Set the benchmark. (default = fhsl_lf)\n");
-    printf("     * sl_pq: Fixed-height skip list Shavit Lotan priority queue written in C; lock-free underneath.\n");
+    printf("     * sl_pq: Fixed-height skip list Shavit Lotan priority queue written in DEF; lock-free underneath.\n");
     printf("     * c_sl_pq: Fixed-height skip list Shavit Lotan priority queue written in C; lock-free underneath.\n");
     printf("     * spray: Fixed-height skip list based priority queue; lock-free with spray delete min.\n");
     printf("     * c_spray: Fixed-height skip list based priority queue written in C; lock-free with spray delete min.\n");
+    printf("     * lj_pq: Fixed-height skip list based priority queue written in DEF; lock-free with spray delete min.\n");
+    printf("     * c_lj_pq: Fixed-height skip list based priority queue written in C; lock-free with spray delete min.\n");
     printf("  -p <mem_policy>: Set the memory policy. (default = retire)\n");
     printf("     * leaky: Leak removed nodes.\n");
     printf("     * retire: Use Forkscan to reclaim removed nodes.\n");
@@ -210,6 +205,8 @@ begin
             xcase "c_sl_pq": config.benchmark = C_SL_PQ;
             xcase "spray": config.benchmark = SPRAY;
             xcase "c_spray": config.benchmark = C_SPRAY;
+            xcase "lj_pq": config.benchmark = LJ_PQ;
+            xcase "c_lj_pq": config.benchmark = C_LJ_PQ;
             xcase _:
                 printf("unknown benchmark: %s\n", argv[i]);
                 exit(1);
@@ -267,6 +264,9 @@ begin
     ocase { SPRAY, POLICY_RETIRE }:
     ocase { SPRAY, POLICY_LEAKY }:
     ocase { C_SPRAY, POLICY_LEAKY }:
+    ocase { LJ_PQ, POLICY_RETIRE }:
+    ocase { LJ_PQ, POLICY_LEAKY }:
+    ocase { C_LJ_PQ, POLICY_LEAKY }:
     xcase _:
         printf("Unsupported configuration:\n");
         printf("  benchmark: %s\n  policy: %s\n",
@@ -440,6 +440,49 @@ begin
                     fi
                 fi
             fi
+/***************************************************************************/
+/*       Linden Jonsson pqueue with underlying lock-free skip-list         */
+/***************************************************************************/
+        xcase LJ_PQ:
+            if insert_action then
+                stats.insert_attempts++;
+                if lj_pq_add(&seed, queue, val) then
+                    stats.insert_successes++;
+                    insert_action = false;
+                fi
+            else // insert_action == false.
+                stats.remove_attempts++;
+                if policy == POLICY_RETIRE then
+                    if lj_pq_pop_min(queue) then
+                        stats.remove_successes++;
+                        insert_action = true;
+                    fi
+                else
+                    if lj_pq_leaky_pop_min(queue) then
+                        stats.remove_successes++;
+                        insert_action = true;
+                    fi
+                fi
+            fi
+/***************************************************************************/
+/*     C Linden Jonsson pqueue with underlying lock-free skip-list         */
+/***************************************************************************/
+        xcase C_LJ_PQ:
+            if insert_action then
+                stats.insert_attempts++;
+                if c_lj_pq_add(&seed, queue, val) == 1 then
+                    stats.insert_successes++;
+                    insert_action = false;
+                fi
+            else // insert_action == false.
+                stats.remove_attempts++;
+                if policy == POLICY_RETIRE then
+                    if c_lj_pq_leaky_pop_min(queue) == 1 then
+                        stats.remove_successes++;
+                        insert_action = true;
+                    fi
+                fi
+            fi
         xcase _:
             printf("error: unknown benchmark configuration.\n");
             exit(1);
@@ -477,6 +520,10 @@ begin
             res = spray_pq_add(&seed, config.structure, val);
         xcase C_SPRAY:
             res = c_spray_pq_add(&seed, config.structure, val) == 1;
+        xcase LJ_PQ:
+            res = lj_pq_add(&seed, config.structure, val);
+        xcase C_LJ_PQ:
+            res = c_lj_pq_add(&seed, config.structure, val);
         xcase _:
             printf("error: unable to initialize unknown set.\n");
             exit(1);
@@ -501,6 +548,10 @@ begin
         config.structure = spray_pq_create(config.thread_count);
     xcase C_SPRAY:
         config.structure = c_spray_pq_create(config.thread_count);
+    xcase LJ_PQ:
+        config.structure = lj_pq_create(config.thread_count);
+    xcase C_LJ_PQ:
+        config.structure = c_lj_pq_create(config.thread_count);
     xcase _:
         printf("error: unable to initialize unknown set.\n");
         exit(1);
