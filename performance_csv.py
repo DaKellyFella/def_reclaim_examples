@@ -35,12 +35,12 @@ structure_map = {
     'structure_category' : 'Hash Table',
     'lang': 'C'
   },
-  'sl_pq' : {
-    'structure_category' : 'Shavit Lotan Queue',
+  'lj_pq' : {
+    'structure_category' : 'Linden Jonsson Queue',
     'lang': 'DEF'
   },
-  'c_sl_pq' : {
-    'structure_category' : 'Shavit Lotan Queue',
+  'c_lj_pq' : {
+    'structure_category' : 'Linden Jonsson Queue',
     'lang': 'C'
   },
   'spray' : {
@@ -115,7 +115,11 @@ def create_line_plots(config, perf_results):
       plt.errorbar(x = range(len(thread_points)), y = y_ticks, linewidth=2,
         label = lang_config, color = style_info['graph_colour'], marker = style_info['graph_style'], markersize=7))
   # plt.gca().set_facecolor((0, 0, 0.25))
-  plt.legend(loc='best', fancybox=True, shadow=True, handles = legends_list, ncol = 3)
+  if structure_name == 'Spray List' or structure_name == 'Linden Jonsson Queue':
+    plt.legend(loc='best', fancybox=True, shadow=True, handles = legends_list, ncol = 1)
+  else:
+    plt.legend(loc='upper left', fancybox=True, shadow=True, handles = legends_list, ncol = 1)
+    
   plt.ylim(ymin = 0)
   x_ticks = [0, 1, 2, 3, 4, 9] + range(18, 153, 18)
   x_ranges = [0, 1, 2, 3, 4, 5] + range(6, len(x_ticks) * 2, 2)

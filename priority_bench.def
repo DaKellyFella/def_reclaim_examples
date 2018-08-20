@@ -105,6 +105,8 @@ begin
     xcase C_SL_PQ: return "c_sl_pq";
     xcase SPRAY: return "spray";
     xcase C_SPRAY: return "c_spray";
+    xcase LJ_PQ: return "lj_pq";
+    xcase C_LJ_PQ: return "c_lj_pq";
     xcase _: return "unknown benchmark";
     esac
     return "FIXME: need reachability detection after a switch.";
@@ -476,8 +478,9 @@ begin
                 fi
             else // insert_action == false.
                 stats.remove_attempts++;
-                if policy == POLICY_RETIRE then
+                if policy == POLICY_LEAKY then
                     if c_lj_pq_leaky_pop_min(queue) == 1 then
+                        
                         stats.remove_successes++;
                         insert_action = true;
                     fi
@@ -523,7 +526,7 @@ begin
         xcase LJ_PQ:
             res = lj_pq_add(&seed, config.structure, val);
         xcase C_LJ_PQ:
-            res = c_lj_pq_add(&seed, config.structure, val);
+            res = c_lj_pq_add(&seed, config.structure, val) == 1;
         xcase _:
             printf("error: unable to initialize unknown set.\n");
             exit(1);
@@ -581,7 +584,6 @@ begin
         fi
     od
     printf("initialisation threads joined\n");
-
     delete thread_data;
     delete tids;
 end

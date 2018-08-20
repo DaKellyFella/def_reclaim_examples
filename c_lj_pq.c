@@ -36,30 +36,18 @@ static node_ptr node_create(int64_t key, int32_t toplevel){
   return node;
 }
 
-node_ptr unmark(node_ptr node){
+static node_ptr unmark(node_ptr node){
   return (node_ptr)(((size_t)node) & (~0x1));
 }
 
-node_ptr mark(node_ptr node){
+static node_ptr mark(node_ptr node){
   return (node_ptr)((size_t)node | 0x1);
 }
 
-bool is_marked(node_ptr node){
+static bool is_marked(node_ptr node){
   return unmark(node) != node;
 }
 
-
-struct unpacked_t {
-  bool marked;
-  node_ptr address;
-};
-
-unpacked_t unpack(node_ptr node) {
-  return (unpacked_t){
-    .marked = is_marked(node),
-    .address = unmark(node)
-    };
-}
 
 /** Print out the contents of the skip list along with node heights.
  */
@@ -213,10 +201,9 @@ static void restructure(c_lj_pq_t *set) {
  *  Leak the memory.
  */
 int c_lj_pq_leaky_pop_min(c_lj_pq_t * set) {
-  node_ptr cur = NULL, next = NULL, newhead = NULL,
+  node_ptr cur = &set->head, next = NULL, newhead = NULL,
     obs_head = NULL;
   int32_t offset = 0;
-  cur = &set->head;
   obs_head = cur->next[0];
   do {
     offset++;
@@ -232,8 +219,7 @@ int c_lj_pq_leaky_pop_min(c_lj_pq_t * set) {
   if(offset <= set->boundoffset) { return true; }
   if(set->head.next[0] != obs_head) { return true; }
 
-  if(__sync_bool_compare_and_swap(&set->head.next[0], 
-    obs_head, mark(newhead))) {
+  if(__sync_bool_compare_and_swap(&set->head.next[0], obs_head, mark(newhead))) {
     restructure(set);
   }
   return true;
