@@ -130,7 +130,6 @@ begin
     xcase C_SO_HT: return "c_so_ht";
     xcase _: return "unknown benchmark";
     esac
-    return "FIXME: need reachability detection after a switch.";
 end
 
 def string_of_policy (p memory_policy_t) -> *char
@@ -140,7 +139,6 @@ begin
     xcase POLICY_RETIRE: return "retire";
     xcase _: return "unknown policy";
     esac
-    return "FIXME: need reachability detection after a switch.";
 end
 
 def help (bench *char) -> void
