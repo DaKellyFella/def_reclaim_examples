@@ -13,6 +13,7 @@ CFLAGS = $(OPTLEVEL) -mrtm
 
 DEF_SETS = \
 	fhsl_lf.def \
+	fhsl_b.def \
 	bt_lf.def \
 	mm_ht.def \
 	so_ht.def
@@ -39,7 +40,7 @@ SET_SRC = $(DEF_SETS) $(C_SETS) utils.c thread_pinner.c set_bench.def
 SET_DEF_OBJ = $(SET_SRC:.def=.o)
 SET_OBJ = $(SET_DEF_OBJ:.c=.o)
 
-PQUEUE_SRC = $(DEF_PQUEUES) $(C_PQUEUES) utils.c thread_pinner.c priority_bench.def
+PQUEUE_SRC = $(DEF_PQUEUES) $(C_PQUEUES) $(DEF_SETS) $(C_SETS) utils.c thread_pinner.c priority_bench.def
 PQUEUE_DEF_OBJ = $(PQUEUE_SRC:.def=.o)
 PQUEUE_OBJ = $(PQUEUE_DEF_OBJ:.c=.o)
 
