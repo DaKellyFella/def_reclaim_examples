@@ -65,16 +65,17 @@ end
 
 def node_is_flagged(node node_ptr) -> bool
 begin
-    return ((cast size_t (node)) & 0x1) == 1;
+    return (cast size_t (node) & 0x1) == 1;
 end
 
 def node_tag(node node_ptr, tag bool) -> node_ptr
 begin
     if tag then
-        return cast node_ptr ((cast size_t (node)) | 0x2);
+        return cast node_ptr (cast size_t (node) | 0x2);
     else
         var is_flagged = node_is_flagged(node);
-        var new_node = cast node_ptr(((cast size_t (node)) >> 2) << 2);
+        var new_node =
+            cast node_ptr ((cast size_t (node) >> 2) << 2);
         return node_flag(new_node, is_flagged);
     fi
 end 

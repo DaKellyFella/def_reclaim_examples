@@ -611,7 +611,7 @@ end
 
 def thread_initialise(arg *void) -> *void 
 begin
-    var thread_data *init_thread_data_t = cast *init_thread_data_t(arg);
+    var thread_data *init_thread_data_t = cast *init_thread_data_t (arg);
     var config *config_t = thread_data.config;
     var seed u64 = cast u64 (time(nil)) + thread_data.id;
     var bound = config.init_size;
