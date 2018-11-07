@@ -231,13 +231,11 @@ int c_spray_pq_add(uint64_t *seed, c_spray_pq_t *pqueue, int64_t key) {
   node_ptr preds[N], succs[N];
   int32_t toplevel = random_level(seed, N);
   node_ptr node = NULL;
-  // int x = 0;
   while(true) {
     if(find(pqueue, key, preds, succs)) {
       node_ptr found_node = succs[BOTTOM];
       state_t found_state = atomic_load_explicit(&found_node->state, memory_order_relaxed);
       if(found_state == DELETED) {
-        // printf("lol %d\n", x++);
         mark_pointers(found_node);
         continue;
       }
@@ -263,79 +261,6 @@ int c_spray_pq_add(uint64_t *seed, c_spray_pq_t *pqueue, int64_t key) {
       }
     }
     return true;
-  }
-}
-
-/** Remove a node, lock-free, from the skiplist.
- */
-static int c_spray_pq_remove_leaky(c_spray_pq_t *pqueue, int64_t key) {
-  node_ptr preds[N], succs[N];
-  node_ptr succ = NULL;
-  while(true) {
-    if(!find(pqueue, key, preds, succs)) {
-      return false;
-    }
-    node_ptr node_to_remove = succs[BOTTOM];
-    bool marked;
-    for(int64_t level = node_to_remove->toplevel; level > BOTTOM; --level) {
-      succ = atomic_load_explicit(&node_to_remove->next[level], memory_order_relaxed);
-      marked = node_is_marked(succ);
-      while(!marked) {
-        bool _ = atomic_compare_exchange_weak_explicit(&node_to_remove->next[level],
-          &succ, node_mark(succ), memory_order_relaxed, memory_order_relaxed);
-        marked = node_is_marked(succ);
-      }
-    }
-    succ = atomic_load_explicit(&node_to_remove->next[BOTTOM], memory_order_relaxed);
-    marked = node_is_marked(succ);
-    while(true) {
-      bool i_marked_it = atomic_compare_exchange_weak_explicit(&node_to_remove->next[BOTTOM],
-        &succ, node_mark(succ), memory_order_relaxed, memory_order_relaxed);
-      marked = node_is_marked(succ);
-      if(i_marked_it) {
-        bool _ = find(pqueue, key, preds, succs);
-        return true;
-      } else if(marked) {
-        return false;
-      }
-    }
-  }
-}
-
-/** Remove a node, lock-free, from the skiplist.
- */
-static int c_spray_pq_remove(c_spray_pq_t *pqueue, int64_t key) {
-  node_ptr preds[N], succs[N];
-  node_ptr succ = NULL;
-  while(true) {
-    if(!find(pqueue, key, preds, succs)) {
-      return false;
-    }
-    node_ptr node_to_remove = succs[BOTTOM];
-    bool marked;
-    for(int64_t level = node_to_remove->toplevel; level > BOTTOM; --level) {
-      succ = atomic_load_explicit(&node_to_remove->next[level], memory_order_relaxed);
-      marked = node_is_marked(succ);
-      while(!marked) {
-        bool _ = atomic_compare_exchange_weak_explicit(&node_to_remove->next[level],
-          &succ, node_mark(succ), memory_order_relaxed, memory_order_relaxed);
-        marked = node_is_marked(succ);
-      }
-    }
-    succ = atomic_load_explicit(&node_to_remove->next[BOTTOM], memory_order_relaxed);
-    marked = node_is_marked(succ);
-    while(true) {
-      bool i_marked_it = atomic_compare_exchange_weak_explicit(&node_to_remove->next[BOTTOM],
-        &succ, node_mark(succ), memory_order_relaxed, memory_order_relaxed);
-      marked = node_is_marked(succ);
-      if(i_marked_it) {
-        bool _ = find(pqueue, key, preds, succs);
-        forkscan_retire(node_to_remove);
-        return true;
-      } else if(marked) {
-        return false;
-      }
-    }
   }
 }
 
@@ -406,21 +331,59 @@ int c_spray_pq_leaky_pop_min(uint64_t *seed, c_spray_pq_t *pqueue) {
 
 
 int c_spray_pq_pop_min(uint64_t *seed, c_spray_pq_t *pqueue) {
-  node_ptr node = spray(seed, pqueue);
-  // If we're not passed the head yet, start just after there.
-  if(atomic_load_explicit(&node->state, memory_order_relaxed) == PADDING) {
-    node = atomic_load_explicit(&pqueue->head.next[0], memory_order_relaxed);
-  }
-  for(uint64_t i = 0; node != &pqueue->tail; node = node_unmark(atomic_load_explicit(&node->next[0], memory_order_relaxed)), i++) {
-    state_t state = atomic_load_explicit(&node->state, memory_order_relaxed);
-    if(state == PADDING || state == DELETED) {
-      continue;
+    bool cleaner = ((fast_rand(seed) % (pqueue->config.thread_count)) == 0);
+  if(cleaner) {
+    node_ptr left = &pqueue->head;
+    node_ptr left_next = atomic_load_explicit(&pqueue->head.next[BOTTOM], memory_order_relaxed);
+    assert(!node_is_marked(left_next));
+    node_ptr right = left_next;
+    bool claimed_node = false;
+    for(; right != &pqueue->tail; right = node_unmark(atomic_load_explicit(&right->next[BOTTOM], memory_order_relaxed))) {
+      state_t state = right->state;
+      if(state == DELETED) { mark_pointers(right); continue; }
+      if(state == ACTIVE) {
+        if(!claimed_node) {
+          claimed_node = (atomic_exchange_explicit(&right->state, DELETED, memory_order_relaxed) == ACTIVE);
+          if(claimed_node) { forkscan_retire(right); }
+          mark_pointers(right);
+          continue;
+        }
+        if(atomic_load_explicit(&pqueue->head.next[BOTTOM], memory_order_relaxed) == left_next) {
+          assert(left_next != right);
+          if(atomic_compare_exchange_weak_explicit(&left->next[BOTTOM], &left_next, right, memory_order_release, memory_order_relaxed)) {
+            // for(node_ptr left_scan = left_next; left_scan != right; left_scan = node_unmark(left_scan->next[BOTTOM])) {
+            //   forkscan_retire(left_scan);
+            // }
+          }
+        }
+        return true;
+      }
     }
-    if(state == ACTIVE && 
-      (atomic_exchange_explicit(&node->state, DELETED, memory_order_relaxed) == ACTIVE)) {
-      bool _ = c_spray_pq_remove(pqueue, node->key);
-      return true;
+    if(atomic_load_explicit(&pqueue->head.next[BOTTOM], memory_order_relaxed) == left_next) {
+      assert(left_next != right);
+      if(atomic_compare_exchange_weak_explicit(&left->next[BOTTOM], &left_next, right, memory_order_release, memory_order_relaxed)) {
+        // for(node_ptr left_scan = left_next; left_scan != right; left_scan = node_unmark(left_scan->next[BOTTOM])) {
+        //   forkscan_retire(left_scan);
+        // }
+      }
     }
+    return claimed_node;
+  } else {
+    node_ptr node = spray(seed, pqueue);
+    // If we're not passed the head yet, start just after there.
+    if(atomic_load_explicit(&node->state, memory_order_relaxed) == PADDING) {
+      node = atomic_load_explicit(&pqueue->head.next[BOTTOM], memory_order_relaxed);
+    }
+    for(; node != &pqueue->tail; node = node_unmark(atomic_load_explicit(&node->next[BOTTOM], memory_order_relaxed))) {
+      state_t state = atomic_load_explicit(&node->state, memory_order_relaxed);
+      if(state == DELETED) { continue; }
+      if(state == ACTIVE && 
+        (atomic_exchange_explicit(&node->state, DELETED, memory_order_relaxed) == ACTIVE)) {
+        forkscan_retire(node);
+        mark_pointers(node);
+        return true;
+      }
+    }
+    return false;
   }
-  return false;
 }

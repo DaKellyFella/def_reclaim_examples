@@ -166,96 +166,6 @@ end
 
 /** Remove a node, lock-free, from the skiplist.
  */
-def spray_pq_remove (pqueue *spray_pq_t, x i64) -> bool
-begin
-    var preds [20]node_ptr;
-    var succs [20]node_ptr;
-    var succ node_ptr;
-    while true do
-        if false == find(pqueue, x, preds, succs) then
-            return false;
-        else
-            var node_to_remove = succs[0];
-            var marked bool;
-            for var level = node_to_remove.toplevel;
-                level >= 1;
-                --level
-            do
-                succ = node_to_remove.next[level];
-                marked = is_marked(succ);
-                while !marked do
-                    __builtin_cas(&node_to_remove.next[level], unmark(succ),
-                                  mark(succ));
-                    succ = node_to_remove.next[level];
-                    marked = is_marked(succ);
-                od
-            od
-            succ = node_to_remove.next[0];
-            marked = is_marked(succ);
-            while true do
-                var i_marked_it = __builtin_cas(&node_to_remove.next[0],
-                                                unmark(succ), mark(succ));
-                succ = succs[0].next[0];
-                marked = is_marked(succ);
-                if i_marked_it then
-                    // FIXME: succs[0]?  Should retire node_to_remove?
-                    retire succs[0];
-                    find(pqueue, x, preds, succs);
-                    return true;
-                elif marked then
-                    return false;
-                fi
-            od
-        fi
-    od
-end
-
-/** Remove a node, lock-free, from the skiplist.  Leak the memory.
- */
-def spray_pq_leaky_remove (pqueue *spray_pq_t, x i64) -> bool
-begin
-    var preds [20]node_ptr;
-    var succs [20]node_ptr;
-    var succ node_ptr;
-    while true do
-        if false == find(pqueue, x, preds, succs) then
-            return false;
-        else
-            var node_to_remove = succs[0];
-            var marked bool;
-            for var level = node_to_remove.toplevel;
-                level >= 1;
-                --level
-            do
-                succ = node_to_remove.next[level];
-                marked = is_marked(succ);
-                while !marked do
-                    __builtin_cas(&node_to_remove.next[level], unmark(succ),
-                                  mark(succ));
-                    succ = node_to_remove.next[level];
-                    marked = is_marked(succ);
-                od
-            od
-            succ = node_to_remove.next[0];
-            marked = is_marked(succ);
-            while true do
-                var i_marked_it = __builtin_cas(&node_to_remove.next[0],
-                                                unmark(succ), mark(succ));
-                succ = succs[0].next[0];
-                marked = is_marked(succ);
-                if i_marked_it then
-                    find(pqueue, x, preds, succs);
-                    return true;
-                elif marked then
-                    return false;
-                fi
-            od
-        fi
-    od
-end
-
-/** Remove a node, lock-free, from the skiplist.
- */
 export
 def spray_pq_pop_min (seed *u64, pqueue *spray_pq_t) -> bool
 begin
@@ -291,7 +201,7 @@ begin
   else
     var node = spray(seed, pqueue);
     if node.state == PADDING then
-        node = pqueue.head.next[0];
+        node = unmark(pqueue.head.next[0]);
     fi
     for ; node != &pqueue.tail; node = unmark(node.next[0]) do  
         // Spray failed, try again
@@ -347,8 +257,7 @@ begin
     if node.state == PADDING then
         node = pqueue.head.next[0];
     fi
-    for ; node != &pqueue.tail; node = unmark(node.next[0]) do  
-        // Spray failed, try again
+    for ; node != &pqueue.tail; node = unmark(node.next[0]) do
         if node.state == DELETED then
             mark_pointers(node);
             continue;
@@ -462,11 +371,11 @@ end
 def ref_and_markbit (ptr node_ptr) -> { node_ptr, bool } =
     { unmark(ptr), is_marked(ptr) };
 
-def mark (ptr volatile*volatile node_t) -> volatile*volatile node_t =
-    cast volatile*volatile node_t (0x1I64 | cast i64 (ptr));
+def mark (ptr node_ptr) -> node_ptr =
+    cast node_ptr (0x1I64 | cast i64 (ptr));
 
-def unmark (ptr volatile*volatile node_t) -> volatile*volatile node_t =
-    cast volatile*volatile node_t (0xFFFFFFFFFFFFFFFEI64 & cast i64 (ptr));
+def unmark (ptr node_ptr) -> node_ptr =
+    cast node_ptr (0xFFFFFFFFFFFFFFFEI64 & cast i64 (ptr));
 
-def is_marked (ptr volatile*volatile node_t) -> bool =
+def is_marked (ptr node_ptr) -> bool =
     cast bool (0x1I64 & cast i64 (ptr));
